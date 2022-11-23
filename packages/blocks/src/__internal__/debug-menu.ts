@@ -8,6 +8,10 @@ import {
 } from '../__internal__';
 import type { BaseBlockModel, Space } from '@blocksuite/store';
 import type { GroupBlockModel } from '../group-block';
+import type {
+  DatabaseBlockModel,
+  DatabaseItemBlockModel,
+} from '../database-block';
 
 // Font Awesome Pro 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc.
 const icons = {
@@ -202,6 +206,25 @@ export class DebugMenu extends LitElement {
       pageId
     );
     this.space.addBlock({ flavour: 'affine:paragraph' }, groupId);
+  }
+
+  private _onAddDataBase() {
+    const root = this.space.root;
+    if (!root) return;
+    const pageId = root.id;
+
+    this.space.captureSync();
+
+    const databaseId = this.space.addBlock<DatabaseBlockModel>(
+      { flavour: 'affine:database' },
+      pageId
+    );
+    for (let i = 0; i < 2; i++) {
+      this.space.addBlock<DatabaseItemBlockModel>(
+        { flavour: 'affine:database-item' },
+        databaseId
+      );
+    }
   }
 
   private _onExportHtml() {
@@ -404,6 +427,14 @@ export class DebugMenu extends LitElement {
           @click=${this._onAddGroup}
         >
           ${icons.addGroup}
+        </button>
+        <button
+          aria-label="add database"
+          title="add database"
+          tabindex="-1"
+          @click=${this._onAddDataBase}
+        >
+          D
         </button>
         <button
           aria-label="export markdown"

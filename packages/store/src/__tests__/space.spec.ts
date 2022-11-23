@@ -8,6 +8,8 @@ import { PageBlockModel } from '../../../blocks/src/page-block/page-model';
 import { ParagraphBlockModel } from '../../../blocks/src/paragraph-block/paragraph-model';
 import { ListBlockModel } from '../../../blocks/src/list-block/list-model';
 import { GroupBlockModel } from '../../../blocks/src/group-block/group-model';
+import { DatabaseBlockModel } from '../../../blocks/src/database-block/database-model';
+import { DatabaseItemBlockModel } from '../../../blocks/src/database-block/database-item-model';
 
 const getStoreOptions = () => ({
   room: '',
@@ -20,6 +22,8 @@ export const BlockSchema = {
   'affine:page': PageBlockModel,
   'affine:list': ListBlockModel,
   'affine:group': GroupBlockModel,
+  'affine:database': DatabaseBlockModel,
+  'affine:database-item': DatabaseItemBlockModel,
 } as const;
 
 function serialize(space: Space) {

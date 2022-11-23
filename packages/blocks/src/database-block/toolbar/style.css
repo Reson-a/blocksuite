@@ -1,0 +1,27 @@
+.affine-database-toolbar {
+  height: 40px;
+  line-height: 40px;
+
+  border-bottom: 1px solid #eee;
+  display: flex;
+}
+
+.view-list {
+  flex: 1;
+}
+
+.view-name {
+  padding: 0 8px;
+  color: #aaa;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.view-name:hover {
+  background: #eee;
+}
+
+.view-name.active {
+  padding: 0 8px;
+  color: inherit;
+}

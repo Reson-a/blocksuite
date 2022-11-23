@@ -1,0 +1,22 @@
+.affine-table {
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: auto;
+}
+
+.affine-table-cell {
+  border-right: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  display: inline-block;
+  height: 100%;
+}
+
+.affine-table-row {
+  display: flex;
+  border-bottom: 1px solid #eee;
+}
+
+.affine-table-footer {
+  display: flex;
+  height: 40px;
+}

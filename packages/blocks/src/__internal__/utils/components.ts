@@ -6,6 +6,7 @@ import type { BaseBlockModel } from '@blocksuite/store';
 import type { ListBlockModel } from '../../list-block/list-model';
 import type { ParagraphBlockModel } from '../../paragraph-block/paragraph-model';
 import type { GroupBlockModel } from '../../group-block/group-model';
+import type { DatabaseBlockModel } from '../../database-block/database-model';
 
 // TODO support dynamic block types
 export function BlockElement(model: BaseBlockModel, host: BlockHost) {
@@ -31,6 +32,15 @@ export function BlockElement(model: BaseBlockModel, host: BlockHost) {
           .host=${host}
         ></group-block>
       `;
+    case 'affine:database':
+      return html`
+        <database-block
+          .model=${model as DatabaseBlockModel}
+          .host=${host}
+        ></database-block>
+      `;
+    case 'affine:database-item':
+      return '';
   }
   return html`<div>Unknown block type: "${model.flavour}"</div>`;
 }
