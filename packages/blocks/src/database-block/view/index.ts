@@ -18,4 +18,4 @@ export interface IViewModel {
 }
 
 export * from './table';
-// export * from './gallery';
+export * from './gallery';

@@ -7,11 +7,19 @@ export type Dictionary<T> = { [key: string]: T };
 @customElement('quill-editor')
 class QuillEditor extends LitElement {
   static styles = css`
-    p {
-      margin: 0;
-    }
     .ql-editor {
       padding: 0 8px;
+    }
+    .ql-clipboard {
+      left: -100000px;
+      height: 1px;
+      overflow-y: hidden;
+      position: absolute;
+      top: 50%;
+    }
+    .ql-container p {
+      margin: 0;
+      padding: 0;
     }
   `;
   @property()
@@ -41,9 +49,9 @@ class QuillEditor extends LitElement {
 
     this.quill.on('text-change', (delta, oldContents, source) =>
       this.dispatchEvent(
-        new CustomEvent('text-change', {
+        new CustomEvent('change', {
           detail: {
-            value: this.quill.getText(),
+            value: this.quill.getText().replace(/\n$/, ''),
             delta,
             oldContents,
             source,

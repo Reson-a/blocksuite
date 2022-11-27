@@ -62,9 +62,14 @@ export function isPageTitle(e: Event) {
   return e.target instanceof HTMLInputElement;
 }
 
+export function isTable(e: Event) {
+  // TODO improve
+  const tagName = (e.target as HTMLElement)?.tagName;
+  return tagName == 'AFFINE-TABLE' || tagName == 'AFFINE-GALLERY';
+}
 function tryPreventDefault(e: MouseEvent) {
   // workaround page title click
-  if (!isPageTitle(e)) {
+  if (!isPageTitle(e) && !isTable(e)) {
     e.preventDefault();
   }
 }

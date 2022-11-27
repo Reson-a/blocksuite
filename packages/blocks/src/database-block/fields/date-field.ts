@@ -1,12 +1,42 @@
-export type DateField = number | undefined;
+import { LitElement, html, css, unsafeCSS } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
+import { styleMap } from 'lit/directives/style-map.js';
+import type { IFieldElement, Field } from '.';
 
-export default {
-  create() {
-    return;
-  },
-  render(field: DateField) {
+export type DateField = number | undefined;
+@customElement(`affine-date-field`)
+class DateFieldElement extends LitElement {
+  static styles = css``;
+
+  @property()
+  field!: DateField;
+
+  static valueToRender(field: DateField) {
     if (!field) return '';
-    // TODO format
-    return new Date(field).toLocaleTimeString();
-  },
-};
+    return new Date(field).toLocaleDateString();
+  }
+
+  static valueToCompare(field: DateField) {
+    return field;
+  }
+
+  render() {
+    return html`<div
+      class=${classMap({ 'affine-date-field': true })}
+      style=${styleMap({})}
+    >
+      <quill-editor
+        value=${DateFieldElement.valueToRender(this.field)}
+      ></quill-editor>
+    </div>`;
+  }
+}
+
+export default DateFieldElement;
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'affine-date-field': DateFieldElement;
+  }
+}

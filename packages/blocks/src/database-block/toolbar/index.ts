@@ -46,8 +46,14 @@ class ToolBar extends LitElement {
         </button>
       </div>
       <div>
+        <button
+          @click=${() => {
+            this.model.addSort();
+          }}
+        >
+          排序
+        </button>
         <button>筛选</button>
-        <button>排序</button>
         <button>分组</button>
       </div>
 

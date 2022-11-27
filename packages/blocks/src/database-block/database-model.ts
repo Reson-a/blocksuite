@@ -3,7 +3,7 @@ import type { DatabaseItemBlockModel } from './database-item-model';
 import { FieldType } from './fields';
 import { DataBaseViewType, ITableViewModel } from './view';
 import type { IViewModel } from './view';
-import { filter, sort } from './utils';
+import { filter, sort, SortDirection } from './utils';
 
 export interface DatabaseBlockProps extends IBaseBlockProps {
   flavour: 'affine:database';
@@ -54,20 +54,24 @@ export class DatabaseBlockModel
       views: [],
       children: [],
       schemas: [
-        { id: '0', name: 'NAME', type: FieldType.Text },
-        { id: '1', name: 'PHONE', type: FieldType.Number },
-        { id: '2', name: 'CREATED_AT', type: FieldType.Date },
+        { id: '0', name: 'Text', type: FieldType.Text },
+        { id: '1', name: 'Number', type: FieldType.Number },
+        { id: '2', name: 'Checkbox', type: FieldType.Checkbox },
+        { id: '3', name: 'Select', type: FieldType.Select },
       ],
       currentViewId: '0',
     });
     block.addView();
+    block.addView(undefined, {
+      type: DataBaseViewType.Gallery,
+    });
     return block;
   }
 
   getItems() {
     const currentView = this.currentView;
-    let items = filter(this.children, currentView.filters);
-    items = sort(items, currentView.sorts);
+    let items = filter(this.children, this.schemas, currentView.filters);
+    items = sort(items, this.schemas, currentView.sorts);
     return items;
   }
 
@@ -110,7 +114,7 @@ export class DatabaseBlockModel
   ) {
     const newView = {
       id: `${this.views.length}`,
-      name: `Table${this.views.length}`,
+      name: `View${this.views.length}`,
       sorts: [],
       filters: [],
       type: DataBaseViewType.Table,
@@ -152,7 +156,7 @@ export class DatabaseBlockModel
   addSchema(index: number = this.schemas.length, schema?: ISchema) {
     const newSchema = {
       id: `${this.schemas.length}`,
-      name: `TEXT_${this.schemas.length}`,
+      name: `Text${this.schemas.length}`,
       type: FieldType.Text,
       ...schema,
     };
@@ -178,4 +182,6 @@ export class DatabaseBlockModel
   getSchemaById(id: string) {
     return this.schemas.find(schema => schema.id == id);
   }
+
+  addSort() {}
 }

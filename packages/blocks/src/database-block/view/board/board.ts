@@ -12,14 +12,13 @@ import type { DatabaseBlockModel, ISchema } from '../../database-model';
 import { repeat } from 'lit/directives/repeat.js';
 // import { classMap } from 'lit/directives/class-map.js';
 // import { styleMap } from 'lit/directives/style-map.js';
-import type { ITableViewModel } from '.';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
 import '../../components/quill-editor';
 
-@customElement(`affine-table`)
-class Table extends LitElement {
+@customElement(`affine-board`)
+class Board extends LitElement {
   static styles = css`
     ${unsafeCSS(style)}
   `;
@@ -37,21 +36,21 @@ class Table extends LitElement {
   items!: DatabaseItemBlockModel[];
 
   @property()
-  currentView!: ITableViewModel;
+  currentView!: IBoardViewModel;
 
   static defaultRowHeight = 36;
   static defaultColWidth = 150;
 
   connectedCallback() {
     if (!this.hasAttribute('role')) {
-      this.setAttribute('role', 'table');
+      this.setAttribute('role', 'board');
     }
     super.connectedCallback();
   }
 
   render() {
-    return html`<div class="affine-table">
-      ${this.renderTableHead()}${this.renderTableBody()}${this.renderTableFooter()}
+    return html`<div class="affine-board">
+      ${this.renderBoardHead()}${this.renderBoardBody()}${this.renderBoardFooter()}
       <slot></slot>
     </div>`;
   }
@@ -63,42 +62,42 @@ class Table extends LitElement {
   }
 
   getRowHeight(itemId: string) {
-    return this.currentView.row[itemId]?.height || Table.defaultRowHeight;
+    return this.currentView.row[itemId]?.height || Board.defaultRowHeight;
   }
 
   getColWidth(fieldId: string) {
-    return this.currentView.col[fieldId]?.width || Table.defaultColWidth;
+    return this.currentView.col[fieldId]?.width || Board.defaultColWidth;
   }
 
-  renderTableHead() {
-    return html`<affine-table-row .height=${Table.defaultRowHeight}
+  renderBoardHead() {
+    return html`<affine-board-row .height=${Board.defaultRowHeight}
       >${repeat(
         this.schemas,
         schema =>
-          html`<affine-table-cell .width=${this.getColWidth(schema.id)}
+          html`<affine-board-cell .width=${this.getColWidth(schema.id)}
             ><quill-editor
               value=${schema.name}
               @change=${e => this.handleSchemaChange(e, schema.id)}
             ></quill-editor>
-          </affine-table-cell>`
+          </affine-board-cell>`
       )}
       <button @click=${() => this.model.addSchema()}>+</button>
-    </affine-table-row>`;
+    </affine-board-row>`;
   }
 
-  renderTableBody() {
+  renderBoardBody() {
     return html`
       ${repeat(
         this.items,
         item =>
-          html`<affine-table-row
+          html`<affine-board-row
             .model=${item}
             .schemas=${this.schemas}
             .height=${this.getRowHeight(item.id)}
             >${repeat(
               this.schemas,
               schema =>
-                html`<affine-table-cell .width=${this.getColWidth(schema.id)}>
+                html`<affine-board-cell .width=${this.getColWidth(schema.id)}>
                   <!-- <rich-text .host=${this
                     .host} .model=${item}></rich-text> -->
 
@@ -109,15 +108,15 @@ class Table extends LitElement {
                       this.handleFieldChange(e, item, schema.id);
                     }
                   )}
-                </affine-table-cell>`
-            )}</affine-table-row
+                </affine-board-cell>`
+            )}</affine-board-row
           >`
       )}
     `;
   }
 
-  renderTableFooter() {
-    return html`<div class="affine-table-footer">
+  renderBoardFooter() {
+    return html`<div class="affine-board-footer">
       <button @click=${() => this.model.addItem({})}>+</button>
     </div>`;
   }
@@ -131,10 +130,10 @@ class Table extends LitElement {
   }
 }
 
-export default Table;
+export default Board;
 
 declare global {
   interface HTMLElementTagNameMap {
-    'affine-table': Table;
+    'affine-board': Board;
   }
 }

@@ -69,6 +69,22 @@ export class DatabaseBlockComponent extends LitElement {
           .currentView=${this.model.currentView}
           .schemas=${this.model.schemas}
         ></affine-table>`;
+      case DataBaseViewType.Gallery:
+        return html`<affine-gallery
+          .model=${this.model}
+          .host=${this.host}
+          .items=${this.model.getItems()}
+          .currentView=${this.model.currentView}
+          .schemas=${this.model.schemas}
+        ></affine-gallery>`;
+      case DataBaseViewType.Board:
+        return html`<affine-board
+          .model=${this.model}
+          .host=${this.host}
+          .items=${this.model.getItems()}
+          .currentView=${this.model.currentView}
+          .schemas=${this.model.schemas}
+        ></affine-board>`;
       default:
         return null;
     }

@@ -7,13 +7,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import './table';
-import './table-cell';
-import './table-row';
+export * from './table';
+export * from './table-cell';
+export * from './table-row';
 
-import type { IViewModel } from '../index';
+import type { DataBaseViewType, IViewModel } from '../index';
 
 export interface ITableViewModel extends IViewModel {
+  type: DataBaseViewType.Table;
   row: Record<string, IRowModel>;
   col: Record<string, IColModel>;
 }

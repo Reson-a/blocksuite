@@ -1,4 +1,6 @@
 import type { DatabaseItemBlockModel } from '../database-item-model';
+import type { ISchema } from '../database-model';
+import { Field, FieldFactory } from '../fields';
 
 export enum SortDirection {
   ASC,
@@ -11,9 +13,30 @@ export interface ISort {
   direction: SortDirection;
 }
 
-export function sort(items: DatabaseItemBlockModel[], sorts: ISort[]) {
+type Comparator = (a: Field, b: Field) => number;
+
+export function sort(
+  items: DatabaseItemBlockModel[],
+  schemas: ISchema[],
+  sorts: ISort[]
+) {
   if (!sorts.length) return items;
   return [...items].sort((a, b) => {
-    return a - b;
+    let result = 0;
+    sorts.some(sort => {
+      if (sort.direction == SortDirection.NONE) return 0;
+      const fieldType = schemas.find(schema => schema.id == sort.id)?.type;
+      if (fieldType == undefined) return;
+      result = FieldFactory.compareField(
+        fieldType,
+        a.fields[sort.id],
+        b.fields[sort.id]
+      );
+      if (result !== 0) {
+        sort.direction === SortDirection.ASC ? result : -result;
+        return true;
+      }
+    });
+    return result;
   });
 }
