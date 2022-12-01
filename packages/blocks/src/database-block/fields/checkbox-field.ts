@@ -2,7 +2,6 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import type { IFieldElement, Field } from '.';
 
 export type CheckboxField = boolean | undefined;
 @customElement(`affine-checkbox-field`)
@@ -31,7 +30,7 @@ class CheckboxFieldElement extends LitElement {
     >
       <input
         type="checkbox"
-        ${this.field ? 'checked' : ''}
+        ?checked=${this.field}
         @change=${this.handleChange}
       />
     </div>`;

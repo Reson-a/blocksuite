@@ -14,7 +14,6 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import '../../components/quill-editor';
 import type { IGalleryViewModel } from '.';
 
 @customElement(`affine-gallery-card`)

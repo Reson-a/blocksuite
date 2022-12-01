@@ -48,7 +48,11 @@ export class DatabaseBlockComponent extends LitElement {
     const childrenContainer = BlockChildrenContainer(this.model, this.host);
 
     return html`
-      <div class="affine-database-block-container">
+      <div
+        class="affine-database-block-container"
+        @mousedown=${e => e.stopPropagation()}
+        @mouseup=${e => e.stopPropagation()}
+      >
         <affine-database-toolbar
           .model=${this.model}
           .views=${this.model.views}

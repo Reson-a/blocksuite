@@ -2,9 +2,9 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import type { IFieldElement, Field } from '.';
 
 export type NumberField = number | undefined;
+
 @customElement(`affine-number-field`)
 class NumberFieldElement extends LitElement {
   static styles = css``;
@@ -26,9 +26,10 @@ class NumberFieldElement extends LitElement {
       class=${classMap({ 'affine-number-field': true })}
       style=${styleMap({})}
     >
-      <quill-editor
+      <affine-input
         value=${NumberFieldElement.valueToRender(this.field)}
-      ></quill-editor>
+        type="number"
+      ></affine-input>
     </div>`;
   }
 }

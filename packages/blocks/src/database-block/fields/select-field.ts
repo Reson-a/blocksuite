@@ -47,16 +47,13 @@ class SelectFieldElement extends LitElement {
       class=${classMap({ 'affine-select-field': true })}
       style=${styleMap({})}
     >
-      <select
-        ${field.multi ? 'multiple' : ''}
-        @change=${e => this.handleChange(e)}
-      >
+      <select ?multiple=${field.multi} @change=${e => this.handleChange(e)}>
         ${repeat(
           field.options,
           (option, index) =>
             html`
               <option
-                ${field.selected.includes(index) ? 'selected' : ''}
+                ?selected=${field.selected.includes(index)}
                 value=${option}
                 data-index=${index}
               >

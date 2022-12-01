@@ -16,7 +16,7 @@ import type { ITableViewModel } from '.';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import '../../components/quill-editor';
+import '../../components/input';
 
 @customElement(`affine-table`)
 class Table extends LitElement {
@@ -76,10 +76,10 @@ class Table extends LitElement {
         this.schemas,
         schema =>
           html`<affine-table-cell .width=${this.getColWidth(schema.id)}
-            ><quill-editor
+            ><affine-input
               value=${schema.name}
               @change=${e => this.handleSchemaChange(e, schema.id)}
-            ></quill-editor>
+            ></affine-input>
           </affine-table-cell>`
       )}
       <button @click=${() => this.model.addSchema()}>+</button>

@@ -23,9 +23,9 @@ class TextFieldElement extends LitElement {
       class=${classMap({ 'affine-text-field': true })}
       style=${styleMap({})}
     >
-      <quill-editor
+      <affine-input
         value=${TextFieldElement.valueToRender(this.field)}
-      ></quill-editor>
+      ></affine-input>
     </div>`;
   }
 }

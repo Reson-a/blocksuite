@@ -2,7 +2,6 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import type { IFieldElement, Field } from '.';
 
 export type DateField = number | undefined;
 @customElement(`affine-date-field`)
@@ -26,9 +25,9 @@ class DateFieldElement extends LitElement {
       class=${classMap({ 'affine-date-field': true })}
       style=${styleMap({})}
     >
-      <quill-editor
+      <affine-input
         value=${DateFieldElement.valueToRender(this.field)}
-      ></quill-editor>
+      ></affine-input>
     </div>`;
   }
 }

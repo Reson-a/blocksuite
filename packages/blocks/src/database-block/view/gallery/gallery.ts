@@ -14,7 +14,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import '../../components/quill-editor';
+import '../../components/input';
 import type { IGalleryViewModel } from '.';
 
 @customElement(`affine-gallery`)
@@ -80,7 +80,6 @@ class Gallery extends LitElement {
   }
 
   handleFieldChange(e: any, item: DatabaseItemBlockModel, id: string) {
-    console.log('sdsd', e);
     item.updateField(id, e.detail.value);
   }
 }

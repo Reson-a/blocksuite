@@ -82,7 +82,7 @@ export type Field =
   | CheckboxField
   | SelectField
   | DateField;
-export interface IFieldElement {
+export interface IField {
   valueToRender(field: Field): string;
   valueToCompare(field: Field): string | number | boolean | undefined;
 }
@@ -92,7 +92,7 @@ export class FieldFactory {
     return {};
   }
 
-  static getField(type: FieldType): IFieldElement | undefined {
+  static getField(type: FieldType): IField | undefined {
     switch (type) {
       case FieldType.Text:
         return TextFieldElement;
@@ -146,10 +146,11 @@ export class FieldFactory {
   }
 
   static compareField(type: FieldType, fieldA: Field, fieldB: Field): number {
-    const fieldEle = FieldFactory.getField(type);
-    if (!fieldEle) return 0;
-    const valueA = fieldEle?.valueToCompare(fieldA) + '';
-    const valueB = fieldEle?.valueToCompare(fieldB) + '';
+    const field = FieldFactory.getField(type);
+    if (!field) return 0;
+    const valueA = field?.valueToCompare(fieldA) + '';
+    const valueB = field?.valueToCompare(fieldB) + '';
+    // TODO value compare
     return valueA.localeCompare(valueB);
   }
 }

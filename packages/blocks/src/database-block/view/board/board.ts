@@ -15,7 +15,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import '../../components/quill-editor';
+import '../../components/affine-input';
 
 @customElement(`affine-board`)
 class Board extends LitElement {
@@ -75,10 +75,10 @@ class Board extends LitElement {
         this.schemas,
         schema =>
           html`<affine-board-cell .width=${this.getColWidth(schema.id)}
-            ><quill-editor
+            ><affine-input
               value=${schema.name}
               @change=${e => this.handleSchemaChange(e, schema.id)}
-            ></quill-editor>
+            ></affine-input>
           </affine-board-cell>`
       )}
       <button @click=${() => this.model.addSchema()}>+</button>
