@@ -3,7 +3,7 @@ import type { DatabaseItemBlockModel } from './database-item-model';
 import { FieldType } from './fields';
 import { DataBaseViewType, ITableViewModel } from './view';
 import type { IViewModel } from './view';
-import { filter, sort, SortDirection } from './utils';
+import { filter, ISort, sort, SortDirection } from './utils';
 
 export interface DatabaseBlockProps extends IBaseBlockProps {
   flavour: 'affine:database';
@@ -12,7 +12,7 @@ export interface DatabaseBlockProps extends IBaseBlockProps {
   views: IViewModel[];
   children: DatabaseItemBlockModel[];
   schemas: ISchema[];
-  currentViewId: string;
+  currentViewId: string /*  */;
 }
 
 export interface ISchema {
@@ -72,6 +72,7 @@ export class DatabaseBlockModel
     const currentView = this.currentView;
     let items = filter(this.children, this.schemas, currentView.filters);
     items = sort(items, this.schemas, currentView.sorts);
+    console.log(items);
     return items;
   }
 
@@ -183,5 +184,34 @@ export class DatabaseBlockModel
     return this.schemas.find(schema => schema.id == id);
   }
 
-  addSort() {}
+  get currentSorts() {
+    return this.currentView?.sorts || [];
+  }
+
+  get currentFilters() {
+    return this.currentView?.filters || [];
+  }
+
+  addSort(index: number = this.currentSorts.length, sort: Partial<ISort> = {}) {
+    const newSort = {
+      id: this.schemas[0].id,
+      direction: SortDirection.ASC,
+      ...sort,
+    };
+    this.currentView.sorts.splice(index, 1, newSort);
+    this.currentView.sorts = [...this.currentSorts];
+    this.syncViews();
+  }
+  updateSort(id: string, sort: Partial<ISort>) {
+    const sortIndex = this.currentSorts.findIndex(sort => sort.id == id);
+    this.currentSorts[sortIndex] = {
+      ...this.currentSorts[sortIndex],
+      ...sort,
+    };
+    this.syncViews();
+  }
+  deleteSort(id: string) {
+    this.currentView.sorts = this.currentSorts.filter(sort => sort.id !== id);
+    this.syncViews();
+  }
 }

@@ -51,9 +51,11 @@ class Gallery extends LitElement {
     return html`<div class="affine-gallery">
       ${repeat(
         this.items,
+        item => item.id,
         item => html`<affine-gallery-card .item=${item}>
           ${repeat(
             this.schemas,
+            schema => schema.id,
             schema =>
               html` ${FieldFactory.renderField(
                 schema.type,

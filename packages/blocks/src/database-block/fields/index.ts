@@ -148,9 +148,14 @@ export class FieldFactory {
   static compareField(type: FieldType, fieldA: Field, fieldB: Field): number {
     const field = FieldFactory.getField(type);
     if (!field) return 0;
-    const valueA = field?.valueToCompare(fieldA) + '';
-    const valueB = field?.valueToCompare(fieldB) + '';
+    const valueA = field?.valueToCompare(fieldA);
+    const valueB = field?.valueToCompare(fieldB);
     // TODO value compare
-    return valueA.localeCompare(valueB);
+    switch (typeof valueA) {
+      case 'number':
+        return valueA - (valueB as number);
+      default:
+        return (valueA + '').localeCompare(valueB + '');
+    }
   }
 }

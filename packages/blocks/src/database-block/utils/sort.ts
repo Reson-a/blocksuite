@@ -24,7 +24,7 @@ export function sort(
   return [...items].sort((a, b) => {
     let result = 0;
     sorts.some(sort => {
-      if (sort.direction == SortDirection.NONE) return 0;
+      if (sort.direction == SortDirection.NONE) return;
       const fieldType = schemas.find(schema => schema.id == sort.id)?.type;
       if (fieldType == undefined) return;
       result = FieldFactory.compareField(
@@ -32,10 +32,9 @@ export function sort(
         a.fields[sort.id],
         b.fields[sort.id]
       );
-      if (result !== 0) {
-        sort.direction === SortDirection.ASC ? result : -result;
-        return true;
-      }
+      if (result == 0) return;
+      else result = sort.direction === SortDirection.ASC ? result : -result;
+      return true;
     });
     return result;
   });

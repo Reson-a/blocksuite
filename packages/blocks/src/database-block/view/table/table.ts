@@ -90,6 +90,7 @@ class Table extends LitElement {
     return html`
       ${repeat(
         this.items,
+        item => item.id,
         item =>
           html`<affine-table-row
             .model=${item}
@@ -97,6 +98,7 @@ class Table extends LitElement {
             .height=${this.getRowHeight(item.id)}
             >${repeat(
               this.schemas,
+              schema => schema.id,
               schema =>
                 html`<affine-table-cell .width=${this.getColWidth(schema.id)}>
                   <!-- <rich-text .host=${this

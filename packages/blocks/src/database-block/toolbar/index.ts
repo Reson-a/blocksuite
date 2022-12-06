@@ -6,6 +6,7 @@ import type { IViewModel } from '../view';
 import style from './style.css';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
+import { SortDirection } from '../utils';
 
 @customElement(`affine-database-toolbar`)
 class ToolBar extends LitElement {
@@ -48,7 +49,15 @@ class ToolBar extends LitElement {
       <div>
         <button
           @click=${() => {
-            this.model.addSort();
+            const sort = this.model.currentSorts[0];
+            if (sort) {
+              this.model.updateSort(sort.id, {
+                direction:
+                  sort.direction == SortDirection.ASC
+                    ? SortDirection.DESC
+                    : SortDirection.ASC,
+              });
+            } else this.model.addSort();
           }}
         >
           排序
