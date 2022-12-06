@@ -2,7 +2,6 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import type { IFieldElement, Field } from '.';
 export type TextField = string;
 @customElement(`affine-text-field`)
 class TextFieldElement extends LitElement {

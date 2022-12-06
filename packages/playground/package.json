@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --project ./tsconfig.json && vite build",
+    "build": "tsc --project ./tsconfig.json && vite build --base=/blocksuite/",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -78,7 +78,7 @@ class Table extends LitElement {
           html`<affine-table-cell .width=${this.getColWidth(schema.id)}
             ><affine-input
               value=${schema.name}
-              @change=${e => this.handleSchemaChange(e, schema.id)}
+              @change=${(e: any) => this.handleSchemaChange(e, schema.id)}
             ></affine-input>
           </affine-table-cell>`
       )}

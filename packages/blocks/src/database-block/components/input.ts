@@ -57,7 +57,7 @@ class Input extends LitElement {
       @change=${this.handleChange}
     />`;
   }
-  handleChange(e) {
+  handleChange(e: any) {
     if (e.target.value == this.value) return;
     this.dispatchEvent(
       new CustomEvent('change', {

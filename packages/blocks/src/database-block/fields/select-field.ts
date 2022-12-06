@@ -3,7 +3,6 @@ import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import type { IFieldElement, Field } from '.';
 
 export type SelectField =
   | {
@@ -47,7 +46,10 @@ class SelectFieldElement extends LitElement {
       class=${classMap({ 'affine-select-field': true })}
       style=${styleMap({})}
     >
-      <select ?multiple=${field.multi} @change=${e => this.handleChange(e)}>
+      <select
+        ?multiple=${field.multi}
+        @change=${(e: any) => this.handleChange(e)}
+      >
         ${repeat(
           field.options,
           (option, index) =>
@@ -64,7 +66,7 @@ class SelectFieldElement extends LitElement {
       </select>
     </div>`;
   }
-  handleChange(e) {
+  handleChange(e: any) {
     const field = this.field || this.getDefaultField();
     const selected = [e.target.selectedIndex];
     this.dispatchEvent(

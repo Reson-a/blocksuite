@@ -35,7 +35,7 @@ class CheckboxFieldElement extends LitElement {
       />
     </div>`;
   }
-  handleChange(e) {
+  handleChange(e: any) {
     this.dispatchEvent(
       new CustomEvent('change', {
         detail: {

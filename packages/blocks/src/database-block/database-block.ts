@@ -50,8 +50,8 @@ export class DatabaseBlockComponent extends LitElement {
     return html`
       <div
         class="affine-database-block-container"
-        @mousedown=${e => e.stopPropagation()}
-        @mouseup=${e => e.stopPropagation()}
+        @mousedown=${(e: any) => e.stopPropagation()}
+        @mouseup=${(e: any) => e.stopPropagation()}
       >
         <affine-database-toolbar
           .model=${this.model}
