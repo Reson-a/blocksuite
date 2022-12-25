@@ -17,15 +17,15 @@ type Comparator = (a: Field, b: Field) => number;
 
 export function sort(
   items: DatabaseItemBlockModel[],
-  schemas: ISchema[],
-  sorts: ISort[]
+  schemaMap: Record<string, ISchema>,
+  sorts?: ISort[]
 ) {
-  if (!sorts.length) return items;
+  if (!sorts || !sorts.length) return items;
   return [...items].sort((a, b) => {
     let result = 0;
     sorts.some(sort => {
       if (sort.direction == SortDirection.NONE) return;
-      const fieldType = schemas.find(schema => schema.id == sort.id)?.type;
+      const fieldType = schemaMap[sort.id]?.type;
       if (fieldType == undefined) return;
       result = FieldFactory.compareField(
         fieldType,

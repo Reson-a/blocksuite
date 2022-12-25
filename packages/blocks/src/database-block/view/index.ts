@@ -1,4 +1,5 @@
-import type { IFilter, ISort } from '../utils';
+import type { FilterType, IFilter, ISort } from '../utils';
+import type { IGroup } from '../utils/group';
 
 export enum DataBaseViewType {
   Table,
@@ -13,8 +14,10 @@ export interface IViewModel {
   name: string;
   type: DataBaseViewType;
   id: string;
-  sorts: ISort[];
-  filters: IFilter[];
+  sorts?: ISort[];
+  filters?: IFilter[];
+  filterType?: FilterType;
+  groups?: IGroup[];
 }
 
 export * from './table';

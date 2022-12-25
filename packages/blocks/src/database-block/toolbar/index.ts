@@ -6,7 +6,7 @@ import type { IViewModel } from '../view';
 import style from './style.css';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import { SortDirection } from '../utils';
+import { FilterOperator, SortDirection } from '../utils';
 
 @customElement(`affine-database-toolbar`)
 class ToolBar extends LitElement {
@@ -62,8 +62,44 @@ class ToolBar extends LitElement {
         >
           排序
         </button>
-        <button>筛选</button>
-        <button>分组</button>
+        <button
+          @click=${() => {
+            const id = this.model.schemas[0].id;
+            const filter = this.model.currentFilters.find(
+              item => item.id == id
+            );
+            if (filter) {
+              this.model.deleteFilter(id);
+            } else this.model.addFilter();
+          }}
+        >
+          筛选第一列不为空
+        </button>
+        <button
+          @click=${() => {
+            const id = this.model.schemas[1].id;
+            const filter = this.model.currentFilters.find(
+              item => item.id == id
+            );
+            if (filter) {
+              this.model.deleteFilter(id);
+            } else
+              this.model.addFilter(undefined, {
+                id,
+                value: 5,
+                operator: FilterOperator.GREATER_THAN,
+              });
+          }}
+        >
+          筛选第二列大于5
+        </button>
+        <button
+          @click=${() => {
+            this.model.addGroup();
+          }}
+        >
+          分组
+        </button>
       </div>
 
       <slot></slot>

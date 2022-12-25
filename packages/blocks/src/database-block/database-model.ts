@@ -3,7 +3,16 @@ import type { DatabaseItemBlockModel } from './database-item-model';
 import { FieldType } from './fields';
 import { DataBaseViewType, ITableViewModel } from './view';
 import type { IViewModel } from './view';
-import { filter, ISort, sort, SortDirection } from './utils';
+import {
+  filter,
+  FilterOperator,
+  IFilter,
+  ISort,
+  sort,
+  SortDirection,
+  group,
+} from './utils';
+import type { IGroup } from './utils/group';
 
 export interface DatabaseBlockProps extends IBaseBlockProps {
   flavour: 'affine:database';
@@ -68,11 +77,21 @@ export class DatabaseBlockModel
     return block;
   }
 
-  getItems() {
+  getItems(withGroup?: boolean) {
     const currentView = this.currentView;
-    let items = filter(this.children, this.schemas, currentView.filters);
-    items = sort(items, this.schemas, currentView.sorts);
-    console.log(items);
+    const schemaMap = this.schemas.reduce((prev, item) => {
+      prev[item.id] = item;
+      return prev;
+    }, {} as Record<string, ISchema>);
+    let items = filter(
+      this.children,
+      schemaMap,
+      currentView.filterType,
+      currentView.filters
+    );
+    items = sort(items, schemaMap, currentView.sorts);
+    if (withGroup && currentView.groups?.length)
+      return group(items, schemaMap, currentView.groups);
     return items;
   }
 
@@ -116,8 +135,6 @@ export class DatabaseBlockModel
     const newView = {
       id: `${this.views.length}`,
       name: `View${this.views.length}`,
-      sorts: [],
-      filters: [],
       type: DataBaseViewType.Table,
       row: {},
       col: {},
@@ -161,7 +178,7 @@ export class DatabaseBlockModel
       type: FieldType.Text,
       ...schema,
     };
-    this.schemas.splice(index, 1, newSchema);
+    this.schemas.splice(index, 0, newSchema);
     this.schemas = [...this.schemas];
     this.syncSchemas();
     this.children.forEach(item => item.addField(newSchema.id));
@@ -192,14 +209,19 @@ export class DatabaseBlockModel
     return this.currentView?.filters || [];
   }
 
+  get currentGroups() {
+    return this.currentView?.groups || [];
+  }
+
   addSort(index: number = this.currentSorts.length, sort: Partial<ISort> = {}) {
     const newSort = {
-      id: this.schemas[0].id,
+      id: this.schemas[index].id,
       direction: SortDirection.ASC,
       ...sort,
     };
-    this.currentView.sorts.splice(index, 1, newSort);
-    this.currentView.sorts = [...this.currentSorts];
+    const sorts = this.currentSorts;
+    sorts.splice(index, 0, newSort);
+    this.currentView.sorts = [...sorts];
     this.syncViews();
   }
   updateSort(id: string, sort: Partial<ISort>) {
@@ -212,6 +234,70 @@ export class DatabaseBlockModel
   }
   deleteSort(id: string) {
     this.currentView.sorts = this.currentSorts.filter(sort => sort.id !== id);
+    this.syncViews();
+  }
+
+  addFilter(
+    index: number = this.currentFilters.length,
+    filter: Partial<IFilter> = {}
+  ) {
+    const newFilter = {
+      id: this.schemas[index].id,
+      value: '',
+      operator: FilterOperator.IS_NOT_NULL,
+      ...filter,
+    };
+    const filters = this.currentFilters;
+    filters.splice(index, 0, newFilter);
+    this.currentView.filters = [...filters];
+    this.syncViews();
+  }
+  updateFilter(id: string, filter: Partial<IFilter>) {
+    const filterIndex = this.currentFilters.findIndex(
+      filter => filter.id == id
+    );
+    this.currentFilters[filterIndex] = {
+      ...this.currentFilters[filterIndex],
+      ...filter,
+    };
+    this.syncViews();
+  }
+  deleteFilter(id: string) {
+    this.currentView.filters = this.currentFilters.filter(
+      filter => filter.id !== id
+    );
+    this.syncViews();
+  }
+
+  hasGroup() {
+    return this.currentView.groups?.length;
+  }
+
+  addGroup(
+    index: number = this.currentGroups.length,
+    group: Partial<IGroup> = {}
+  ) {
+    const newGroup = {
+      id: this.schemas[index].id,
+      ...group,
+    };
+    const groups = this.currentGroups;
+    groups.splice(index, 0, newGroup);
+    this.currentView.groups = [...groups];
+    this.syncViews();
+  }
+  updateGroup(id: string, group: Partial<IGroup>) {
+    const groupIndex = this.currentGroups.findIndex(group => group.id == id);
+    this.currentGroups[groupIndex] = {
+      ...this.currentGroups[groupIndex],
+      ...group,
+    };
+    this.syncViews();
+  }
+  deleteGroup(id: string) {
+    this.currentView.groups = this.currentGroups.filter(
+      group => group.id !== id
+    );
     this.syncViews();
   }
 }

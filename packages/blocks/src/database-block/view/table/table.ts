@@ -13,10 +13,11 @@ import { repeat } from 'lit/directives/repeat.js';
 // import { classMap } from 'lit/directives/class-map.js';
 // import { styleMap } from 'lit/directives/style-map.js';
 import type { ITableViewModel } from '.';
-import type { DatabaseItemBlockModel } from '../../database-item-model';
+import { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
 import '../../components/input';
+import type { IGroupItem } from '../../utils';
 
 @customElement(`affine-table`)
 class Table extends LitElement {
@@ -34,7 +35,7 @@ class Table extends LitElement {
   schemas!: ISchema[];
 
   @property()
-  items!: DatabaseItemBlockModel[];
+  items!: Array<IGroupItem | DatabaseItemBlockModel>;
 
   @property()
   currentView!: ITableViewModel;
@@ -91,29 +92,47 @@ class Table extends LitElement {
       ${repeat(
         this.items,
         item => item.id,
-        item =>
-          html`<affine-table-row
-            .model=${item}
-            .schemas=${this.schemas}
-            .height=${this.getRowHeight(item.id)}
-            >${repeat(
-              this.schemas,
-              schema => schema.id,
-              schema =>
-                html`<affine-table-cell .width=${this.getColWidth(schema.id)}>
-                  <!-- <rich-text .host=${this
-                    .host} .model=${item}></rich-text> -->
+        item => {
+          if (item instanceof DatabaseItemBlockModel)
+            return this.renderRow(item);
+          else return this.renderRowGroup(item);
+        }
+      )}
+    `;
+  }
 
-                  ${FieldFactory.renderField(
-                    schema.type,
-                    item.fields[schema.id],
-                    e => {
-                      this.handleFieldChange(e, item, schema.id);
-                    }
-                  )}
-                </affine-table-cell>`
-            )}</affine-table-row
-          >`
+  renderRow(item: DatabaseItemBlockModel) {
+    return html`<affine-table-row
+      .model=${item}
+      .schemas=${this.schemas}
+      .height=${this.getRowHeight(item.id)}
+      >${repeat(
+        this.schemas,
+        schema => schema.id,
+        schema =>
+          html`<affine-table-cell .width=${this.getColWidth(schema.id)}>
+            <!-- <rich-text .host=${this.host} .model=${item}></rich-text> -->
+
+            ${FieldFactory.renderField(
+              schema.type,
+              item.fields[schema.id],
+              e => {
+                this.handleFieldChange(e, item, schema.id);
+              }
+            )}
+          </affine-table-cell>`
+      )}</affine-table-row
+    >`;
+  }
+
+  renderRowGroup(item: IGroupItem) {
+    return html`
+      ${repeat(
+        item.items,
+        item => item.id,
+        item => html`<affine-row-group .id=${item.id}>
+          ${this.renderRow(item)}
+        </affine-row-group>`
       )}
     `;
   }
