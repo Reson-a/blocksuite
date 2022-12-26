@@ -117,7 +117,7 @@ class Board extends LitElement {
 
   renderBoardFooter() {
     return html`<div class="affine-board-footer">
-      <button @click=${() => this.model.addItem({})}>+</button>
+      <button @click=${() => this.model.addItem()}>+</button>
     </div>`;
   }
 

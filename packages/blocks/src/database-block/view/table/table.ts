@@ -125,21 +125,24 @@ class Table extends LitElement {
     >`;
   }
 
-  renderRowGroup(item: IGroupItem) {
-    return html`
+  renderRowGroup(groupItem: IGroupItem) {
+    return html`<affine-table-row-group
+      .title=${groupItem.id}
+      .model=${this.model}
+      .group=${groupItem.group}
+    >
       ${repeat(
-        item.items,
+        groupItem.items,
         item => item.id,
-        item => html`<affine-row-group .id=${item.id}>
-          ${this.renderRow(item)}
-        </affine-row-group>`
+        item => html`${this.renderRow(item)}`
       )}
-    `;
+    </affine-table-row-group> `;
   }
 
   renderTableFooter() {
+    if (this.model.hasGroup()) return;
     return html`<div class="affine-table-footer">
-      <button @click=${() => this.model.addItem({})}>+</button>
+      <button @click=${() => this.model.addItem()}>+</button>
     </div>`;
   }
 

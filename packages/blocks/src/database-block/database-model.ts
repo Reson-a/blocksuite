@@ -102,14 +102,15 @@ export class DatabaseBlockModel
   }
 
   addItem(
-    props: Partial<DatabaseItemBlockModel>,
-    index = this.children.length
+    index = this.children.length,
+    props: Partial<DatabaseItemBlockModel> = {}
   ) {
-    this.space.addBlock(
+    const id = this.space.addBlock(
       { flavour: 'affine:database-item', ...props },
       this,
       index
     );
+    return this.space.getBlockById(id);
   }
 
   updateItem(id: string, props: Partial<DatabaseItemBlockModel>) {

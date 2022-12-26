@@ -3,8 +3,10 @@ import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 import style from './style.css';
+
+import type { DatabaseBlockModel, ISchema } from '../../database-model';
+import type { IGroup } from '../../utils';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
-import type { ISchema } from '../../database-model';
 
 @customElement(`affine-table-row-group`)
 class TableRowGroup extends LitElement {
@@ -13,7 +15,7 @@ class TableRowGroup extends LitElement {
   `;
 
   @property()
-  model!: DatabaseItemBlockModel;
+  model!: DatabaseBlockModel;
 
   @property()
   schemas!: ISchema[];
@@ -22,14 +24,31 @@ class TableRowGroup extends LitElement {
   selected!: boolean;
 
   @property()
-  id!: string;
+  hide!: boolean;
+
+  @property()
+  title!: string;
+
+  @property()
+  group!: IGroup;
 
   render() {
     return html`<div
       class=${classMap({ 'affine-table-row-group': true })}
       style=${styleMap({})}
     >
+      <affine-table-cell>${this.title || ''}</affine-table-cell>
       <slot></slot>
+      <button
+        @click=${() => {
+          const item = this.model.addItem(undefined, {
+            // fields: { [this.group.id]: this.title },
+          }) as DatabaseItemBlockModel;
+          item.updateField(this.group.id, this.title);
+        }}
+      >
+        +
+      </button>
     </div> `;
   }
 }
