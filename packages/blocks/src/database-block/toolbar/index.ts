@@ -95,7 +95,11 @@ class ToolBar extends LitElement {
         </button>
         <button
           @click=${() => {
-            this.model.addGroup();
+            if (this.currentView.groups?.length) {
+              this.currentView.groups.forEach(group => {
+                this.model.deleteGroup(group.id);
+              });
+            } else this.model.addGroup();
           }}
         >
           分组

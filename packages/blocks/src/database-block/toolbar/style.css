@@ -18,7 +18,7 @@
 }
 
 .view-name:hover {
-  background: #eee;
+  background: var(--affine-hover-background);
 }
 
 .view-name.active {

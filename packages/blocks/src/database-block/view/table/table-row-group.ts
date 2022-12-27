@@ -37,18 +37,20 @@ class TableRowGroup extends LitElement {
       class=${classMap({ 'affine-table-row-group': true })}
       style=${styleMap({})}
     >
-      <affine-table-cell>${this.title || ''}</affine-table-cell>
+      <div class="affine-table-row-group-header">${this.title || ''}</div>
       <slot></slot>
-      <button
-        @click=${() => {
-          const item = this.model.addItem(undefined, {
-            // fields: { [this.group.id]: this.title },
-          }) as DatabaseItemBlockModel;
-          item.updateField(this.group.id, this.title);
-        }}
-      >
-        +
-      </button>
+      <div class="affine-table-row-group-footer">
+        <button
+          @click=${() => {
+            const item = this.model.addItem(undefined, {
+              // fields: { [this.group.id]: this.title },
+            }) as DatabaseItemBlockModel;
+            item.updateField(this.group.id, this.title);
+          }}
+        >
+          +
+        </button>
+      </div>
     </div> `;
   }
 }

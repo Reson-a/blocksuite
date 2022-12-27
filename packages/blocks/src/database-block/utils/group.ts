@@ -18,17 +18,20 @@ function groupBy(
   group: IGroup,
   schema: ISchema
 ) {
-  const map = {} as Record<string, IGroupItem>;
+  const map = new Map<string, IGroupItem>();
   items.forEach(item => {
-    const id =
-      FieldFactory.getField(schema.type)?.valueToCompare(
-        item.fields[schema.id]
-      ) + '';
-    map[id] = map[id] || { id, group, schema, items: [] };
-    map[id].items.push(item);
+    const field = item.fields[schema.id];
+    const id = field
+      ? FieldFactory.getField(schema.type)?.valueToCompare(field) + ''
+      : '';
+    if (!map.get(id)) map.set(id, { id, group, schema, items: [] });
+    (map.get(id) as IGroupItem).items.push(item);
   });
 
-  return Object.values(map).sort((a, b) => a.id.localeCompare(b.id));
+  return [...map.values()].sort((a, b) => {
+    if (!a.id.length) return 1;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 export function group(
