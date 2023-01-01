@@ -16,8 +16,8 @@ import type { DataBaseViewType, IViewModel } from '../index';
 
 export interface ITableViewModel extends IViewModel {
   type: DataBaseViewType.Table;
-  row: Record<string, IRowModel>;
-  col: Record<string, IColModel>;
+  row?: Record<string, IRowModel>;
+  col?: Record<string, IColModel>;
 }
 
 interface IRowModel {

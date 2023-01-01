@@ -42,7 +42,7 @@ class TableRowGroup extends LitElement {
       <div class="affine-table-row-group-footer">
         <button
           @click=${() => {
-            const item = this.model.addItem(undefined, {
+            const item = this.model.addItem({
               // fields: { [this.group.id]: this.title },
             }) as DatabaseItemBlockModel;
             item.updateField(this.group.id, this.title);

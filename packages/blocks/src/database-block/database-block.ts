@@ -85,7 +85,7 @@ export class DatabaseBlockComponent extends LitElement {
         return html`<affine-board
           .model=${this.model}
           .host=${this.host}
-          .items=${this.model.getItems()}
+          .items=${this.model.getItems(true)}
           .currentView=${this.model.currentView}
           .schemas=${this.model.schemas}
         ></affine-board>`;

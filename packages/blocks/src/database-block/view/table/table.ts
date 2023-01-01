@@ -64,11 +64,11 @@ class Table extends LitElement {
   }
 
   getRowHeight(itemId: string) {
-    return this.currentView.row[itemId]?.height || Table.defaultRowHeight;
+    return this.currentView.row?.[itemId]?.height || Table.defaultRowHeight;
   }
 
   getColWidth(fieldId: string) {
-    return this.currentView.col[fieldId]?.width || Table.defaultColWidth;
+    return this.currentView.col?.[fieldId]?.width || Table.defaultColWidth;
   }
 
   renderTableHead() {

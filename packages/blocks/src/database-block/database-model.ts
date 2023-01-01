@@ -70,9 +70,16 @@ export class DatabaseBlockModel
       ],
       currentViewId: '0',
     });
-    block.addView();
-    block.addView(undefined, {
+    block.addView({
+      name: 'Table',
+    });
+    block.addView({
       type: DataBaseViewType.Gallery,
+      name: 'Gallery',
+    });
+    block.addView({
+      type: DataBaseViewType.Board,
+      name: 'Board',
     });
     return block;
   }
@@ -90,8 +97,15 @@ export class DatabaseBlockModel
       currentView.filters
     );
     items = sort(items, schemaMap, currentView.sorts);
-    if (withGroup && currentView.groups?.length)
-      return group(items, schemaMap, currentView.groups);
+    if (withGroup) {
+      if (this.currentView.groups?.length) {
+        return group(items, schemaMap, currentView.groups);
+        // 看板视图默认需要分组
+      } else if (this.currentView.type == DataBaseViewType.Board) {
+        return group(items, schemaMap, [{ id: this.schemas[0].id }]);
+      }
+    }
+
     return items;
   }
 
@@ -102,8 +116,8 @@ export class DatabaseBlockModel
   }
 
   addItem(
-    index = this.children.length,
-    props: Partial<DatabaseItemBlockModel> = {}
+    props: Partial<DatabaseItemBlockModel> = {},
+    index = this.children.length
   ) {
     const id = this.space.addBlock(
       { flavour: 'affine:database-item', ...props },
@@ -130,15 +144,13 @@ export class DatabaseBlockModel
   }
 
   addView<T extends IViewModel>(
-    index: number = this.views.length,
-    props?: Partial<T>
+    props?: Partial<T>,
+    index: number = this.views.length
   ) {
     const newView = {
       id: `${this.views.length}`,
       name: `View${this.views.length}`,
       type: DataBaseViewType.Table,
-      row: {},
-      col: {},
       ...props,
     };
     this.views.splice(index, 0, newView);
@@ -172,7 +184,7 @@ export class DatabaseBlockModel
     // });
   }
 
-  addSchema(index: number = this.schemas.length, schema?: ISchema) {
+  addSchema(schema?: ISchema, index: number = this.schemas.length) {
     const newSchema = {
       id: `${this.schemas.length}`,
       name: `Text${this.schemas.length}`,
@@ -214,9 +226,9 @@ export class DatabaseBlockModel
     return this.currentView?.groups || [];
   }
 
-  addSort(index: number = this.currentSorts.length, sort: Partial<ISort> = {}) {
+  addSort(sort: Partial<ISort> = {}, index: number = this.currentSorts.length) {
     const newSort = {
-      id: this.schemas[index].id,
+      id: this.schemas[0].id,
       direction: SortDirection.ASC,
       ...sort,
     };
@@ -239,11 +251,11 @@ export class DatabaseBlockModel
   }
 
   addFilter(
-    index: number = this.currentFilters.length,
-    filter: Partial<IFilter> = {}
+    filter: Partial<IFilter> = {},
+    index: number = this.currentFilters.length
   ) {
     const newFilter = {
-      id: this.schemas[index].id,
+      id: this.schemas[0].id,
       value: '',
       operator: FilterOperator.IS_NOT_NULL,
       ...filter,
@@ -275,11 +287,11 @@ export class DatabaseBlockModel
   }
 
   addGroup(
-    index: number = this.currentGroups.length,
-    group: Partial<IGroup> = {}
+    group: Partial<IGroup> = {},
+    index: number = this.currentGroups.length
   ) {
     const newGroup = {
-      id: this.schemas[index].id,
+      id: this.schemas[0].id,
       ...group,
     };
     const groups = this.currentGroups;

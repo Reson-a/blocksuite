@@ -14,16 +14,18 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import type { IGalleryViewModel } from '.';
+import type { IViewModel } from '../index';
 
-@customElement(`affine-gallery-card`)
-class GalleryCard extends LitElement {
+@customElement(`affine-card`)
+class Card extends LitElement {
   static styles = css`
-    .affine-gallery-card {
+    .affine-card {
       box-shadow: rgb(15 15 15 / 10%) 0px 0px 0px 1px,
         rgb(15 15 15 / 10%) 0px 2px 4px;
       border-radius: 3px;
       padding: 8px 10px;
+      margin-bottom: 16px;
+      margin-right: 16px;
     }
   `;
 
@@ -31,7 +33,7 @@ class GalleryCard extends LitElement {
   model!: DatabaseBlockModel;
 
   @property()
-  view!: IGalleryViewModel;
+  view!: IViewModel;
 
   @property()
   schema!: ISchema[];
@@ -40,7 +42,7 @@ class GalleryCard extends LitElement {
   item!: DatabaseItemBlockModel;
 
   render() {
-    return html`<div class="affine-gallery-card">
+    return html`<div class="affine-card">
       <slot></slot>
     </div>`;
   }
@@ -52,10 +54,10 @@ class GalleryCard extends LitElement {
   }
 }
 
-export default GalleryCard;
+export default Card;
 
 declare global {
   interface HTMLElementTagNameMap {
-    'affine-gallery-card': GalleryCard;
+    'affine-card': Card;
   }
 }

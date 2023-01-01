@@ -1,9 +1,11 @@
 import type { DatabaseItemBlockModel } from '../database-item-model';
 import type { ISchema } from '../database-model';
 import { FieldFactory } from '../fields';
+import { SortDirection } from './sort';
 
 export interface IGroup {
   id: string;
+  sort?: SortDirection;
 }
 
 export interface IGroupItem {
@@ -30,7 +32,9 @@ function groupBy(
 
   return [...map.values()].sort((a, b) => {
     if (!a.id.length) return 1;
-    return a.id.localeCompare(b.id);
+    return group.sort == SortDirection.DESC
+      ? b.id.localeCompare(a.id)
+      : a.id.localeCompare(b.id);
   });
 }
 

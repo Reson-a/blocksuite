@@ -15,6 +15,7 @@ import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
 import '../../components/input';
+import '../card';
 import type { IGalleryViewModel } from '.';
 
 @customElement(`affine-gallery`)
@@ -24,7 +25,6 @@ class Gallery extends LitElement {
       display: grid;
       position: relative;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
       padding: 16px 2px;
     }
   `;
@@ -52,7 +52,7 @@ class Gallery extends LitElement {
       ${repeat(
         this.items,
         item => item.id,
-        item => html`<affine-gallery-card .item=${item}>
+        item => html`<affine-card .item=${item}>
           ${repeat(
             this.schemas,
             schema => schema.id,
@@ -65,7 +65,7 @@ class Gallery extends LitElement {
                 }
               )}`
           )}
-        </affine-gallery-card>`
+        </affine-card>`
       )}
       <slot></slot>
     </div>`;

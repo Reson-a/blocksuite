@@ -84,7 +84,7 @@ class ToolBar extends LitElement {
             if (filter) {
               this.model.deleteFilter(id);
             } else
-              this.model.addFilter(undefined, {
+              this.model.addFilter({
                 id,
                 value: 5,
                 operator: FilterOperator.GREATER_THAN,

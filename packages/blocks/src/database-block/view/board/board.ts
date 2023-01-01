@@ -7,7 +7,6 @@ import {
   PropertyValueMap,
 } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import style from './style.css';
 import type { DatabaseBlockModel, ISchema } from '../../database-model';
 import { repeat } from 'lit/directives/repeat.js';
 // import { classMap } from 'lit/directives/class-map.js';
@@ -15,12 +14,23 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { DatabaseItemBlockModel } from '../../database-item-model';
 import type { BlockHost } from '../../../__internal__';
 import { FieldFactory } from '../../fields';
-import '../../components/affine-input';
+import '../../components/input';
+import type { IBoardViewModel } from '.';
+import type { IGroupItem } from '../../utils';
 
 @customElement(`affine-board`)
 class Board extends LitElement {
   static styles = css`
-    ${unsafeCSS(style)}
+    .affine-board {
+      display: flex;
+      padding: 16px 2px;
+    }
+    .affine-board-group {
+    }
+    .affine-board-item-count {
+      font-size: 14px;
+      color: #ccc;
+    }
   `;
 
   @property()
@@ -33,24 +43,56 @@ class Board extends LitElement {
   schemas!: ISchema[];
 
   @property()
-  items!: DatabaseItemBlockModel[];
+  items!: IGroupItem[];
 
   @property()
   currentView!: IBoardViewModel;
 
-  static defaultRowHeight = 36;
-  static defaultColWidth = 150;
-
-  connectedCallback() {
-    if (!this.hasAttribute('role')) {
-      this.setAttribute('role', 'board');
-    }
-    super.connectedCallback();
-  }
+  static defaultHeight = 36;
+  static defaultWidth = 150;
 
   render() {
     return html`<div class="affine-board">
-      ${this.renderBoardHead()}${this.renderBoardBody()}${this.renderBoardFooter()}
+      ${repeat(
+        this.items,
+        groupItem => groupItem.id,
+        groupItem => html`<div class="affine-board-group">
+          <div>
+            <span class="affine-board-title">${groupItem.id || 'No Type'}</span>
+            <span class="affine-board-item-count"
+              >${groupItem.items.length}</span
+            >
+          </div>
+          ${repeat(
+            groupItem.items,
+            item => item.id,
+            item => html`<affine-card .item=${item}>
+              ${repeat(
+                this.schemas,
+                schema => schema.id,
+                schema =>
+                  html` ${FieldFactory.renderField(
+                    schema.type,
+                    item.fields[schema.id],
+                    e => {
+                      this.handleFieldChange(e, item, schema.id);
+                    }
+                  )}`
+              )}
+            </affine-card>`
+          )}
+          <button
+            @click=${() => {
+              const item = this.model.addItem({
+                // fields: { [this.group.id]: this.title },
+              }) as DatabaseItemBlockModel;
+              item.updateField(groupItem.group.id, groupItem.id);
+            }}
+          >
+            +
+          </button>
+        </div>`
+      )}
       <slot></slot>
     </div>`;
   }
@@ -59,66 +101,6 @@ class Board extends LitElement {
     _changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>
   ): void {
     console.log(this.model, _changedProperties);
-  }
-
-  getRowHeight(itemId: string) {
-    return this.currentView.row[itemId]?.height || Board.defaultRowHeight;
-  }
-
-  getColWidth(fieldId: string) {
-    return this.currentView.col[fieldId]?.width || Board.defaultColWidth;
-  }
-
-  renderBoardHead() {
-    return html`<affine-board-row .height=${Board.defaultRowHeight}
-      >${repeat(
-        this.schemas,
-        schema =>
-          html`<affine-board-cell .width=${this.getColWidth(schema.id)}
-            ><affine-input
-              value=${schema.name}
-              @change=${e => this.handleSchemaChange(e, schema.id)}
-            ></affine-input>
-          </affine-board-cell>`
-      )}
-      <button @click=${() => this.model.addSchema()}>+</button>
-    </affine-board-row>`;
-  }
-
-  renderBoardBody() {
-    return html`
-      ${repeat(
-        this.items,
-        item =>
-          html`<affine-board-row
-            .model=${item}
-            .schemas=${this.schemas}
-            .height=${this.getRowHeight(item.id)}
-            >${repeat(
-              this.schemas,
-              schema =>
-                html`<affine-board-cell .width=${this.getColWidth(schema.id)}>
-                  <!-- <rich-text .host=${this
-                    .host} .model=${item}></rich-text> -->
-
-                  ${FieldFactory.renderField(
-                    schema.type,
-                    item.fields[schema.id],
-                    e => {
-                      this.handleFieldChange(e, item, schema.id);
-                    }
-                  )}
-                </affine-board-cell>`
-            )}</affine-board-row
-          >`
-      )}
-    `;
-  }
-
-  renderBoardFooter() {
-    return html`<div class="affine-board-footer">
-      <button @click=${() => this.model.addItem()}>+</button>
-    </div>`;
   }
 
   handleSchemaChange(e: any, id: string) {
