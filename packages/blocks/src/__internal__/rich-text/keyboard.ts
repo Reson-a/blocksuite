@@ -1,15 +1,15 @@
-import type { BaseBlockModel, Space } from '@blocksuite/store';
+import type { BaseBlockModel, Page } from '@blocksuite/store';
 import type { Quill, RangeStatic } from 'quill';
 import {
   ALLOW_DEFAULT,
-  focusNextBlock,
-  focusPreviousBlock,
   getCurrentRange,
+  getNextBlock,
   isCollapsedAtBlockStart,
   isMultiBlockRange,
+  matchFlavours,
   noop,
   PREVENT_DEFAULT,
-} from '../utils';
+} from '../utils/index.js';
 import {
   handleLineStartBackspace,
   handleUnindent,
@@ -20,8 +20,8 @@ import {
   handleKeyDown,
   handleKeyUp,
   tryMatchSpaceHotkey,
-} from './rich-text-operations';
-import { Shortcuts } from './shortcuts';
+} from './rich-text-operations.js';
+import { Shortcuts } from './shortcuts.js';
 
 interface QuillRange {
   index: number;
@@ -69,7 +69,7 @@ function isAtBlockEnd(quill: Quill) {
   return quill.getLength() - 1 === quill.getSelection(true)?.index;
 }
 
-export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
+export function createKeyboardBindings(page: Page, model: BaseBlockModel) {
   function enterMarkdownMatch(
     this: KeyboardEventThis,
     range: QuillRange,
@@ -93,10 +93,10 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
 
   function hardEnter(this: KeyboardEventThis) {
     const isEnd = isAtBlockEnd(this.quill);
-    const parent = space.getParent(model);
+    const parent = page.getParent(model);
     const isLastChild = parent?.lastChild() === model;
     const isEmptyList =
-      model.flavour === 'affine:list' && model.text?.length === 0;
+      matchFlavours(model, ['affine:list']) && model.text?.length === 0;
     const index = this.quill.getSelection()?.index || 0;
 
     // Some block should treat Enter as soft enter
@@ -109,21 +109,34 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
         flavour: 'affine:paragraph',
         type: 'quote',
       },
+      {
+        flavour: 'affine:code',
+        type: 'code',
+      },
     ];
 
     if (
       isEmptyList &&
-      parent?.flavour === 'affine:group' &&
+      parent &&
+      matchFlavours(parent, ['affine:group']) &&
       model.children.length === 0
     ) {
-      handleLineStartBackspace(space, model);
+      handleLineStartBackspace(page, model);
     } else if (isEmptyList && isLastChild) {
-      handleUnindent(space, model, index);
+      // Before
+      // - line1
+      //   - ↩ <-- press Enter
+      //
+      // After
+      // - line1
+      // - | <-- will unindent the block
+      handleUnindent(page, model, index);
     } else if (isEnd) {
-      const isSoftEnterBlock =
-        shouldSoftEnterFirstBlocks.findIndex(({ flavour, type }) => {
+      const isSoftEnterBlock = shouldSoftEnterFirstBlocks.find(
+        ({ flavour, type }) => {
           return model.flavour === flavour && model.type === type;
-        }) !== -1;
+        }
+      );
 
       const isNewLine = /\n\n$/.test(this.quill.getText());
       const shouldSoftEnter = isSoftEnterBlock && !isNewLine;
@@ -135,7 +148,7 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
         if (isSoftEnterBlock) {
           this.quill.deleteText(index, 1);
         }
-        handleBlockEndEnter(space, model);
+        handleBlockEndEnter(page, model);
       }
     } else {
       const isSoftEnterBlock =
@@ -146,7 +159,7 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
       if (isSoftEnterBlock) {
         onSoftEnter.bind(this)();
       } else {
-        handleBlockSplit(space, model, index);
+        handleBlockSplit(page, model, index);
       }
     }
 
@@ -155,25 +168,26 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
 
   function onSoftEnter(this: KeyboardEventThis) {
     const index = this.quill.getSelection()?.index || 0;
-    handleSoftEnter(space, model, index);
+    handleSoftEnter(page, model, index);
     this.quill.setSelection(index + 1, 0);
 
     return PREVENT_DEFAULT;
   }
 
   function onIndent(this: KeyboardEventThis) {
-    const index = this.quill.getSelection()?.index || 0;
-    handleIndent(space, model, index);
+    const index = this.quill.getSelection()?.index;
+    handleIndent(page, model, index);
     return PREVENT_DEFAULT;
   }
 
   function onUnindent(this: KeyboardEventThis) {
-    const index = this.quill.getSelection()?.index || 0;
-    handleUnindent(space, model, index);
+    const index = this.quill.getSelection()?.index;
+    handleUnindent(page, model, index);
     return PREVENT_DEFAULT;
   }
 
   function onKeyUp(this: KeyboardEventThis, range: QuillRange) {
+    // return PREVENT_DEFAULT;
     if (range.index >= 0) {
       return handleKeyUp(model, this.quill.root);
     }
@@ -190,16 +204,19 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
   function onKeyLeft(this: KeyboardEventThis, range: QuillRange) {
     // range.length === 0 means collapsed selection, if have range length, the cursor is in the start of text
     if (range.index === 0 && range.length === 0) {
-      focusPreviousBlock(model, 'end');
       return PREVENT_DEFAULT;
     }
+
     return ALLOW_DEFAULT;
   }
 
   function onKeyRight(this: KeyboardEventThis, range: QuillRange) {
     const textLength = this.quill.getText().length;
     if (range.index + 1 === textLength) {
-      focusNextBlock(model, 'start');
+      const nextBlock = getNextBlock(model.id);
+      if (!nextBlock) {
+        return ALLOW_DEFAULT;
+      }
       return PREVENT_DEFAULT;
     }
     return ALLOW_DEFAULT;
@@ -212,14 +229,16 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
   ) {
     const { quill } = this;
     const { prefix } = context;
-    return tryMatchSpaceHotkey(space, model, quill, prefix, range);
+    return tryMatchSpaceHotkey(page, model, quill, prefix, range);
   }
 
   function onBackspace(this: KeyboardEventThis) {
     // To workaround uncontrolled behavior when deleting character at block start,
     // in this case backspace should be handled in quill.
     if (isCollapsedAtBlockStart(this.quill)) {
-      handleLineStartBackspace(space, model);
+      // window.requestAnimationFrame(() => {
+      handleLineStartBackspace(page, model);
+      // });
       return PREVENT_DEFAULT;
     } else if (isMultiBlockRange(getCurrentRange())) {
       // return PREVENT_DEFAULT;
@@ -229,6 +248,11 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
   }
 
   const keyboardBindings: KeyboardBindings = {
+    'code exit': {
+      key: 'enter',
+      // override default quill behavior
+      handler: () => ALLOW_DEFAULT,
+    },
     enterMarkdownMatch: {
       key: 'enter',
       handler: enterMarkdownMatch,
@@ -259,13 +283,13 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
     'list autofill': {
       key: ' ',
       shiftKey: false,
-      prefix: /^(\d+\.|-|\*|\[ ?\]|\[x\]|(#){1,6}|>)$/,
+      prefix: /^(\d+\.|-|\*|\[ ?\]|\[x\]|(#){1,6}|(-){3}|(\*){3}|>)$/,
       handler: onSpace,
     },
     'list autofill shift': {
       key: ' ',
       shiftKey: true,
-      prefix: /^(\d+\.|-|\*|\[ ?\]|\[x\]|(#){1,6}|>)$/,
+      prefix: /^(\d+\.|-|\*|\[ ?\]|\[x\]|(#){1,6}|(-){3}|(\*){3}|>)$/,
       handler: onSpace,
     },
     backspace: {
@@ -282,7 +306,7 @@ export function createKeyboardBindings(space: Space, model: BaseBlockModel) {
       shiftKey: false,
       handler: onKeyDown,
     },
-    'embed left': {
+    left: {
       key: 37,
       shiftKey: false,
       handler: onKeyLeft,

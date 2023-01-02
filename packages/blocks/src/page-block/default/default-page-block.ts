@@ -1,111 +1,84 @@
 /// <reference types="vite/client" />
-import { LitElement, html, css, unsafeCSS } from 'lit';
+import { html, css, unsafeCSS, PropertyValueMap } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { styleMap } from 'lit/directives/style-map.js';
-import { Disposable, Signal, Space, Text } from '@blocksuite/store';
-import type { PageBlockModel } from '..';
+import { Signal, Page, Text, BaseBlockModel } from '@blocksuite/store';
+import type { PageBlockModel } from '../index.js';
 import {
-  type BlockHost,
+  assertExists,
   asyncFocusRichText,
   BLOCK_ID_ATTR,
-  hotkey,
   BlockChildrenContainer,
+  type BlockHost,
+  getCurrentRange,
+  getModelsByRange,
+  hotkey,
+  isMultiBlockRange,
   SelectionPosition,
-  HOTKEYS,
-  assertExists,
-  isPageTitle,
-  getSplicedTitle,
-  noop,
-} from '../../__internal__';
-import { DefaultSelectionManager } from './selection-manager';
+} from '../../__internal__/index.js';
+import { DefaultSelectionManager } from './selection-manager.js';
+import { deleteModels, tryUpdateGroupSize } from '../utils/index.js';
 import {
-  batchUpdateTextType,
-  bindCommonHotkey,
-  handleBackspace,
-  handleBlockSelectionBatchDelete,
-  handleSelectAll,
-  removeCommonHotKey,
-  tryUpdateGroupSize,
-  updateTextType,
-} from '../utils';
-import style from './style.css';
+  CodeBlockOptionContainer,
+  EmbedEditingContainer,
+  EmbedSelectedRectsContainer,
+  FrameSelectionRect,
+  SelectedRectsContainer,
+} from './components.js';
+import {
+  bindHotkeys,
+  isControlledKeyboardEvent,
+  removeHotkeys,
+} from './utils.js';
+import style from './style.css?inline';
+import { NonShadowLitElement } from '../../__internal__/utils/lit.js';
+import { getService } from '../../__internal__/service.js';
+import autosize from 'autosize';
+
+export interface EmbedEditingState {
+  position: { x: number; y: number };
+  model: BaseBlockModel;
+}
+
+export type CodeBlockOption = EmbedEditingState;
 
 export interface DefaultPageSignals {
   updateFrameSelectionRect: Signal<DOMRect | null>;
   updateSelectedRects: Signal<DOMRect[]>;
+  updateEmbedRects: Signal<
+    { left: number; top: number; width: number; height: number }[]
+  >;
+  updateEmbedEditingState: Signal<EmbedEditingState | null>;
+  updateCodeBlockOption: Signal<CodeBlockOption | null>;
+  nativeSelection: Signal<boolean>;
 }
 
 // https://stackoverflow.com/a/2345915
-function focusTextEnd(input: HTMLInputElement) {
+function focusTextEnd(input: HTMLTextAreaElement) {
   const current = input.value;
   input.focus();
   input.value = '';
   input.value = current;
 }
 
-function FrameSelectionRect(rect: DOMRect | null) {
-  if (rect === null) return html``;
-
-  const style = {
-    left: rect.left + 'px',
-    top: rect.top + 'px',
-    width: rect.width + 'px',
-    height: rect.height + 'px',
-  };
-  return html`
-    <style>
-      .affine-page-frame-selection-rect {
-        position: absolute;
-        background: var(--affine-selected-color);
-        z-index: 1;
-        pointer-events: none;
-      }
-    </style>
-    <div
-      class="affine-page-frame-selection-rect"
-      style=${styleMap(style)}
-    ></div>
-  `;
-}
-
-function SelectedRectsContainer(rects: DOMRect[]) {
-  return html`
-    <style>
-      .affine-page-selected-rects-container > div {
-        position: fixed;
-        background: var(--affine-selected-color);
-        z-index: 1;
-        pointer-events: none;
-        border-radius: 5px;
-      }
-    </style>
-    <div class="affine-page-selected-rects-container">
-      ${rects.map(rect => {
-        const style = {
-          display: 'block',
-          left: rect.left + 'px',
-          top: rect.top + 'px',
-          width: rect.width + 'px',
-          height: rect.height + 'px',
-        };
-        return html`<div style=${styleMap(style)}></div>`;
-      })}
-    </div>
-  `;
-}
-
-@customElement('default-page-block')
-export class DefaultPageBlockComponent extends LitElement implements BlockHost {
+@customElement('affine-default-page')
+export class DefaultPageBlockComponent
+  extends NonShadowLitElement
+  implements BlockHost
+{
   static styles = css`
     ${unsafeCSS(style)}
   `;
 
   @property()
-  space!: Space;
+  page!: Page;
+
+  @property()
+  readonly = false;
 
   flavour = 'affine:page' as const;
 
   selection!: DefaultSelectionManager;
+  getService = getService;
 
   lastSelectionPosition: SelectionPosition = 'start';
 
@@ -118,12 +91,30 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
   @state()
   selectedRects: DOMRect[] = [];
 
+  @state()
+  selectEmbedRects: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }[] = [];
+
+  @state()
+  embedEditingState!: EmbedEditingState | null;
+
+  @state()
+  codeBlockOption!: CodeBlockOption | null;
+
   signals: DefaultPageSignals = {
     updateFrameSelectionRect: new Signal<DOMRect | null>(),
     updateSelectedRects: new Signal<DOMRect[]>(),
+    updateEmbedRects: new Signal<
+      { left: number; top: number; width: number; height: number }[]
+    >(),
+    updateEmbedEditingState: new Signal<EmbedEditingState | null>(),
+    updateCodeBlockOption: new Signal<CodeBlockOption | null>(),
+    nativeSelection: new Signal<boolean>(),
   };
-
-  private _scrollDisposable!: Disposable;
 
   public isCompositionStart = false;
 
@@ -135,197 +126,85 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
   model!: PageBlockModel;
 
   @query('.affine-default-page-block-title')
-  private _title!: HTMLInputElement;
-
-  private _bindHotkeys() {
-    const { space } = this;
-    const {
-      BACKSPACE,
-      SELECT_ALL,
-      H1,
-      H2,
-      H3,
-      H4,
-      H5,
-      H6,
-      SHIFT_UP,
-      SHIFT_DOWN,
-      NUMBERED_LIST,
-      BULLETED,
-      TEXT,
-    } = HOTKEYS;
-
-    bindCommonHotkey(space);
-    hotkey.addListener(BACKSPACE, e => {
-      const { state } = this.selection;
-      if (isPageTitle(e)) {
-        const target = e.target as HTMLInputElement;
-        // range delete
-        if (target.selectionStart !== target.selectionEnd) {
-          e.preventDefault();
-          const title = getSplicedTitle(target);
-          space.updateBlock(this.model, { title });
-        }
-        // collapsed delete
-        else {
-          noop();
-        }
-        return;
-      }
-
-      if (state.type === 'native') {
-        handleBackspace(space, e);
-      } else if (state.type === 'block') {
-        const { selectedRichTexts } = state;
-        handleBlockSelectionBatchDelete(
-          space,
-          selectedRichTexts.map(richText => richText.model)
-        );
-        state.clear();
-        this.signals.updateSelectedRects.emit([]);
-      }
-    });
-
-    hotkey.addListener(SELECT_ALL, e => {
-      // console.log('e: ', e);
-      e.preventDefault();
-      handleSelectAll();
-      this.selection.state.type = 'native';
-    });
-
-    hotkey.addListener(H1, () =>
-      this._updateType('affine:paragraph', 'h1', space)
-    );
-    hotkey.addListener(H2, () =>
-      this._updateType('affine:paragraph', 'h2', space)
-    );
-    hotkey.addListener(H3, () =>
-      this._updateType('affine:paragraph', 'h3', space)
-    );
-    hotkey.addListener(H4, () =>
-      this._updateType('affine:paragraph', 'h4', space)
-    );
-    hotkey.addListener(H5, () =>
-      this._updateType('affine:paragraph', 'h5', space)
-    );
-    hotkey.addListener(H6, () =>
-      this._updateType('affine:paragraph', 'h6', space)
-    );
-    hotkey.addListener(NUMBERED_LIST, () =>
-      this._updateType('affine:list', 'numbered', space)
-    );
-    hotkey.addListener(BULLETED, () =>
-      this._updateType('affine:list', 'bulleted', space)
-    );
-    hotkey.addListener(TEXT, () =>
-      this._updateType('affine:paragraph', 'text', space)
-    );
-    hotkey.addListener(SHIFT_UP, e => {
-      // TODO expand selection up
-    });
-    hotkey.addListener(SHIFT_DOWN, e => {
-      // TODO expand selection down
-    });
-
-    // !!!
-    // Don't forget to remove hotkeys at `_removeHotkeys`
-  }
-
-  private _removeHotkeys() {
-    removeCommonHotKey();
-    hotkey.removeListener([
-      HOTKEYS.UNDO,
-      HOTKEYS.REDO,
-      HOTKEYS.BACKSPACE,
-      HOTKEYS.SELECT_ALL,
-      HOTKEYS.INLINE_CODE,
-      HOTKEYS.STRIKE,
-      HOTKEYS.H1,
-      HOTKEYS.H2,
-      HOTKEYS.H3,
-      HOTKEYS.H4,
-      HOTKEYS.H5,
-      HOTKEYS.H6,
-      HOTKEYS.SHIFT_UP,
-      HOTKEYS.SHIFT_DOWN,
-      HOTKEYS.LINK,
-      HOTKEYS.BULLETED,
-      HOTKEYS.NUMBERED_LIST,
-      HOTKEYS.TEXT,
-    ]);
-  }
+  private _title!: HTMLTextAreaElement;
 
   private _onTitleKeyDown(e: KeyboardEvent) {
-    const hasContent = !this.space.isEmpty;
+    const hasContent = !this.page.isEmpty;
+    const { page, model, _title } = this;
 
     if (e.key === 'Enter' && hasContent) {
-      assertExists(this._title.selectionStart);
-      const titleCursorIndex = this._title.selectionStart;
-      const contentLeft = this._title.value.slice(0, titleCursorIndex);
-      const contentRight = this._title.value.slice(titleCursorIndex);
+      assertExists(_title.selectionStart);
+      const titleCursorIndex = _title.selectionStart;
+      const contentLeft = _title.value.slice(0, titleCursorIndex);
+      const contentRight = _title.value.slice(titleCursorIndex);
 
-      const defaultGroup = this.model.children[0];
+      const defaultGroup = model.children[0];
       const props = {
         flavour: 'affine:paragraph',
-        text: new Text(this.space, contentRight),
+        text: new Text(page, contentRight),
       };
-      const newFirstParagraphId = this.space.addBlock(props, defaultGroup, 0);
-      this.space.updateBlock(this.model, { title: contentLeft });
-      asyncFocusRichText(this.space, newFirstParagraphId);
+      const newFirstParagraphId = page.addBlock(props, defaultGroup, 0);
+      page.updateBlock(model, { title: contentLeft });
+      page.workspace.setPageMeta(page.id, { title: contentLeft });
+      autosize.update(this._title);
+      asyncFocusRichText(this.page, newFirstParagraphId);
     } else if (e.key === 'ArrowDown' && hasContent) {
       e.preventDefault();
-      asyncFocusRichText(this.space, this.model.children[0].children[0].id);
+      asyncFocusRichText(page, model.children[0].children[0].id);
     }
   }
 
   private _onTitleInput(e: InputEvent) {
-    const { space } = this;
+    const { page } = this;
 
     if (!this.model.id) {
-      const title = (e.target as HTMLInputElement).value;
-      const pageId = space.addBlock({ flavour: 'affine:page', title });
-      const groupId = space.addBlock({ flavour: 'affine:group' }, pageId);
-      space.addBlock({ flavour: 'affine:paragraph' }, groupId);
+      const title = (e.target as HTMLTextAreaElement).value;
+      const pageId = page.addBlock({ flavour: 'affine:page', title });
+      const groupId = page.addBlock({ flavour: 'affine:group' }, pageId);
+      page.addBlock({ flavour: 'affine:paragraph' }, groupId);
       return;
     }
 
-    const title = (e.target as HTMLInputElement).value;
-    space.updateBlock(this.model, { title });
-  }
-
-  private _updateType(flavour: string, type: string, space: Space) {
-    const { state } = this.selection;
-    if (state.selectedRichTexts.length > 0) {
-      batchUpdateTextType(
-        flavour,
-        space,
-        state.selectedRichTexts.map(richText => richText.model),
-        type
-      );
-    } else {
-      updateTextType(flavour, type, space);
+    let title = (e.target as HTMLTextAreaElement).value;
+    if (title.endsWith('\n')) {
+      title = title.slice(0, -1);
     }
+    page.updateBlock(this.model, { title });
+    page.workspace.setPageMeta(page.id, { title });
   }
 
-  private _clearSelection() {
+  private _clearSelection = () => {
     this.selection.state.clear();
     this.signals.updateSelectedRects.emit([]);
-  }
-
-  // disable shadow DOM to workaround quill
-  createRenderRoot() {
-    return this;
-  }
+    this.signals.updateEmbedRects.emit([]);
+    this.signals.updateEmbedEditingState.emit(null);
+  };
 
   update(changedProperties: Map<string, unknown>) {
-    if (changedProperties.has('mouseRoot') && changedProperties.has('space')) {
-      this.selection = new DefaultSelectionManager(
-        this.space,
-        this.mouseRoot,
-        this.signals
-      );
+    if (changedProperties.has('mouseRoot') && changedProperties.has('page')) {
+      this.selection = new DefaultSelectionManager({
+        page: this.page,
+        mouseRoot: this.mouseRoot,
+        signals: this.signals,
+        container: this,
+      });
     }
+
+    this._tryUpdateMetaTitle();
     super.update(changedProperties);
+  }
+
+  // happens on undo/redo (model update)
+  private _tryUpdateMetaTitle() {
+    const { _title } = this;
+    if (!_title || _title.value === undefined) {
+      return;
+    }
+
+    const { page } = this;
+    if (_title.value !== page.meta.title) {
+      page.workspace.setPageMeta(page.id, { title: this._title.value });
+    }
   }
 
   private _handleCompositionStart = () => {
@@ -336,8 +215,35 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
     this.isCompositionStart = false;
   };
 
+  // Fixes: https://github.com/toeverything/blocksuite/issues/200
+  // We shouldn't prevent user input, because there could have CN/JP/KR... input,
+  //  that have pop-up for selecting local characters.
+  // So we could just hook on the keydown event and detect whether user input a new character.
+  private _handleNativeKeydown = (e: KeyboardEvent) => {
+    if (isControlledKeyboardEvent(e)) {
+      return;
+    }
+    // Only the length of character buttons is 1
+    if (
+      (e.key.length === 1 || e.key === 'Enter') &&
+      window.getSelection()?.type === 'Range'
+    ) {
+      const range = getCurrentRange();
+      if (isMultiBlockRange(range)) {
+        const intersectedModels = getModelsByRange(range);
+        deleteModels(this.page, intersectedModels);
+      }
+      window.removeEventListener('keydown', this._handleNativeKeydown);
+    } else if (window.getSelection()?.type !== 'Range') {
+      // remove, user don't have native selection
+      window.removeEventListener('keydown', this._handleNativeKeydown);
+    }
+  };
+
   firstUpdated() {
-    this._bindHotkeys();
+    autosize(this._title);
+    bindHotkeys(this.page, this.selection, this.signals, this.model);
+
     hotkey.enableHotkey();
     this.model.propsUpdated.on(() => {
       if (this.model.title !== this._title.value) {
@@ -354,19 +260,35 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
       this.selectedRects = rects;
       this.requestUpdate();
     });
+    this.signals.updateEmbedRects.on(rects => {
+      this.selectEmbedRects = rects;
+      this.requestUpdate();
+    });
+    this.signals.updateEmbedEditingState.on(embedEditingState => {
+      this.embedEditingState = embedEditingState;
+      this.requestUpdate();
+    });
+    this.signals.updateCodeBlockOption.on(codeBlockOption => {
+      this.codeBlockOption = codeBlockOption;
+      this.requestUpdate();
+    });
 
-    tryUpdateGroupSize(this.space, 1);
+    this.signals.nativeSelection.on(bind => {
+      if (bind) {
+        window.addEventListener('keydown', this._handleNativeKeydown);
+      } else {
+        window.removeEventListener('keydown', this._handleNativeKeydown);
+      }
+    });
+
+    tryUpdateGroupSize(this.page, 1);
     this.addEventListener('keydown', e => {
       if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-      tryUpdateGroupSize(this.space, 1);
+      tryUpdateGroupSize(this.page, 1);
     });
 
     // TMP: clear selected rects on scroll
-    const scrollContainer = this.mouseRoot.querySelector(
-      '.affine-default-viewport'
-    ) as HTMLDivElement;
-    const scrollSignal = Signal.fromEvent(scrollContainer, 'scroll');
-    this._scrollDisposable = scrollSignal.on(() => this._clearSelection());
+    document.addEventListener('wheel', this._clearSelection);
     window.addEventListener('compositionstart', this._handleCompositionStart);
     window.addEventListener('compositionend', this._handleCompositionEnd);
 
@@ -376,38 +298,61 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
   override disconnectedCallback() {
     super.disconnectedCallback();
 
-    this._removeHotkeys();
-    this._scrollDisposable.dispose();
+    removeHotkeys();
     this.selection.dispose();
     window.removeEventListener(
       'compositionstart',
       this._handleCompositionStart
     );
     window.removeEventListener('compositionend', this._handleCompositionEnd);
+    document.removeEventListener('wheel', this._clearSelection);
+  }
+
+  protected updated(changedProperties: PropertyValueMap<this>) {
+    const titleInput = this.querySelector('.affine-default-page-block-title');
+
+    if (this.readonly) {
+      titleInput?.setAttribute('disabled', 'disabled');
+    } else {
+      titleInput?.removeAttribute('disabled');
+    }
   }
 
   render() {
     this.setAttribute(BLOCK_ID_ATTR, this.model.id);
 
-    const childrenContainer = BlockChildrenContainer(this.model, this);
+    const childrenContainer = BlockChildrenContainer(this.model, this, () =>
+      this.requestUpdate()
+    );
     const selectionRect = FrameSelectionRect(this.frameSelectionRect);
     const selectedRectsContainer = SelectedRectsContainer(this.selectedRects);
-
+    const selectedEmbedContainer = EmbedSelectedRectsContainer(
+      this.selectEmbedRects
+    );
+    const embedEditingContainer = EmbedEditingContainer(
+      this.embedEditingState,
+      this.signals
+    );
+    const codeBlockOptionContainer = CodeBlockOptionContainer(
+      this.codeBlockOption
+    );
     return html`
       <div class="affine-default-viewport">
         <div class="affine-default-page-block-container">
           <div class="affine-default-page-block-title-container">
-            <input
+            <textarea
+              .value=${this.model.title}
               placeholder="Title"
               class="affine-default-page-block-title"
-              value=${this.model.title}
               @keydown=${this._onTitleKeyDown}
               @input=${this._onTitleInput}
-            />
+            ></textarea>
           </div>
           ${childrenContainer}
         </div>
-        ${selectionRect} ${selectedRectsContainer}
+        ${selectedRectsContainer} ${selectionRect}
+        ${selectedEmbedContainer}${embedEditingContainer}
+        ${codeBlockOptionContainer}
       </div>
     `;
   }
@@ -415,6 +360,6 @@ export class DefaultPageBlockComponent extends LitElement implements BlockHost {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'default-page-block': DefaultPageBlockComponent;
+    'affine-default-page': DefaultPageBlockComponent;
   }
 }

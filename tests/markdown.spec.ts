@@ -4,21 +4,21 @@ import {
   enterPlaygroundRoom,
   focusRichText,
   getCursorBlockIdAndHeight,
-  initEmptyState,
+  initEmptyParagraphState,
   undoByClick,
   undoByKeyboard,
-} from './utils/actions';
+} from './utils/actions/index.js';
 import {
   assertBlockType,
   assertRichTexts,
   assertText,
   assertTextContain,
   assertTextFormat,
-} from './utils/asserts';
+} from './utils/asserts.js';
 
 test('markdown shortcut', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await resetHistory(page);
 
@@ -135,11 +135,22 @@ test('markdown shortcut', async ({ page }) => {
   await assertText(page, '> ');
   await undoByClick(page);
   await assertRichTexts(page, ['\n']);
+
+  await page.keyboard.type('--- ');
+  await undoByClick(page);
+  await assertRichTexts(page, ['--- ']);
+  await undoByClick(page);
+  await assertRichTexts(page, ['\n']);
+  await page.keyboard.type('*** ');
+  await undoByClick(page);
+  await assertRichTexts(page, ['*** ']);
+  await undoByClick(page);
+  await assertRichTexts(page, ['\n']);
 });
 
 test('markdown inline-text', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await resetHistory(page);
 

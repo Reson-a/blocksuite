@@ -1,10 +1,21 @@
-import type { Store, Space, BaseBlockModel } from '../../packages/store/src';
+/* eslint-disable @typescript-eslint/no-restricted-imports */
+import type {
+  Workspace,
+  Page,
+  BaseBlockModel,
+} from '../../packages/store/src/index.js';
+import type { EditorContainer } from '../../packages/editor/src/components/editor-container.js';
+import type {} from '../../packages/playground/src/components/debug-menu.js';
+import type { DebugMenu } from '../../packages/playground/src/components/debug-menu.js';
 
 declare global {
   interface Window {
     /** Available on playground window */
-    store: Store;
+    std: typeof import('../../packages/blocks/src/std.js').default;
+    workspace: Workspace;
     blockSchema: Record<string, typeof BaseBlockModel>;
-    space: Space;
+    page: Page;
+    debugMenu: DebugMenu;
+    editor: EditorContainer;
   }
 }

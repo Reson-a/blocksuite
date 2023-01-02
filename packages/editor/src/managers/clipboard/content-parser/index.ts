@@ -1,9 +1,13 @@
 import { marked } from 'marked';
 import type { PageBlockModel } from '@blocksuite/blocks';
 import { BaseBlockModel, Signal } from '@blocksuite/store';
-import type { OpenBlockInfo, EditorContainer, SelectedBlock } from '../../..';
-import { FileExporter } from '../../file-exporter/file-exporter';
-import { ParserHtml } from './parse-html';
+import type {
+  OpenBlockInfo,
+  EditorContainer,
+  SelectedBlock,
+} from '../../../index.js';
+import { FileExporter } from '../../file-exporter/file-exporter.js';
+import { ParserHtml } from './parse-html.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ParseHtml2BlockFunc = (...args: any[]) => OpenBlockInfo[] | null;
@@ -22,17 +26,20 @@ export class ContentParser {
   }
 
   public onExportHtml() {
-    const root = this._editor.space.root;
+    const root = this._editor.page.root;
     if (!root) return;
     const htmlContent = this.block2Html(this._getSelectedBlock(root).children);
     FileExporter.exportHtml((root as PageBlockModel).title, htmlContent);
   }
 
   public onExportMarkdown() {
-    const root = this._editor.space.root;
+    const root = this._editor.page.root;
     if (!root) return;
     const htmlContent = this.block2Html(this._getSelectedBlock(root).children);
-    FileExporter.exportMarkdown((root as PageBlockModel).title, htmlContent);
+    FileExporter.exportHtmlAsMarkdown(
+      (root as PageBlockModel).title,
+      htmlContent
+    );
   }
 
   public block2Html(blocks: SelectedBlock[]): string {
@@ -128,7 +135,7 @@ export class ContentParser {
     previousSibling: SelectedBlock | null,
     nextSibling: SelectedBlock | null
   ): string {
-    const model = this._editor.space.getBlockById(block.id);
+    const model = this._editor.page.getBlockById(block.id);
     if (!model) {
       return '';
     }
@@ -158,7 +165,7 @@ export class ContentParser {
   }
 
   private _getTextInfoBySelectionInfo(selectedBlock: SelectedBlock): string {
-    const model = this._editor.space.getBlockById(selectedBlock.id);
+    const model = this._editor.page.getBlockById(selectedBlock.id);
     if (!model) {
       return '';
     }

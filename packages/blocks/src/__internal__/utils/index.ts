@@ -1,10 +1,18 @@
-export * from './consts';
-export * from './types';
-export * from './common-operations';
-export * from './rect';
-export * from './hotkey';
-export * from './query';
-export * from './components';
-export * from './gesture';
-export * from './selection';
-export * from './std';
+/**
+ * This file should be pure, which means cannot modify global environment
+ *  and couldn't cause differ between server and browser.
+ *
+ * Simply put, `import '@blocksuite/blocks/std.ts'` should work well in the Next.js
+ */
+export * from './consts.js';
+export * from './types.js';
+export * from './common-operations.js';
+export * from './rect.js';
+export * from './hotkey.js';
+export * from './query.js';
+export * from './components.js';
+export * from './gesture.js';
+export * from './selection.js';
+export * from './std.js';
+export * from './shape.js';
+export * from './lit.js';

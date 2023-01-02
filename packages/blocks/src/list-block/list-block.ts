@@ -1,18 +1,20 @@
 /// <reference types="vite/client" />
-import { LitElement, html, css, unsafeCSS } from 'lit';
+import { html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import {
   BLOCK_ID_ATTR,
+  BlockChildrenContainer,
   BlockHost,
   getBlockElementByModel,
   getDefaultPageBlock,
-} from '../__internal__';
+  NonShadowLitElement,
+} from '../__internal__/index.js';
+import '../__internal__/rich-text/rich-text.js';
 
-import type { ListBlockModel } from './list-model';
-import { getListIcon } from './utils/get-list-icon';
-import { getListInfo } from './utils/get-list-info';
-import { BlockChildrenContainer } from '../__internal__';
-import style from './style.css';
+import type { ListBlockModel } from './list-model.js';
+import { getListIcon } from './utils/get-list-icon.js';
+import { getListInfo } from './utils/get-list-info.js';
+import style from './style.css?inline';
 
 function selectList(model: ListBlockModel) {
   const selectionManager = getDefaultPageBlock(model).selection;
@@ -22,11 +24,12 @@ function selectList(model: ListBlockModel) {
     console.error('list block model:', model, 'blockElement:', blockElement);
     throw new Error('Failed to select list! blockElement not found!');
   }
-  const selectionRect = blockElement.getBoundingClientRect();
-  selectionManager.selectBlockByRect(selectionRect);
+  const blockRect = blockElement.getBoundingClientRect();
+  selectionManager.resetSelectedBlockByRect(blockRect);
 }
-@customElement('list-block')
-export class ListBlockComponent extends LitElement {
+
+@customElement('affine-list')
+export class ListBlockComponent extends NonShadowLitElement {
   static styles = css`
     ${unsafeCSS(style)}
   `;
@@ -40,11 +43,6 @@ export class ListBlockComponent extends LitElement {
 
   @property()
   host!: BlockHost;
-
-  // disable shadow DOM to workaround quill
-  createRenderRoot() {
-    return this;
-  }
 
   firstUpdated() {
     this.model.propsUpdated.on(() => this.requestUpdate());
@@ -63,13 +61,17 @@ export class ListBlockComponent extends LitElement {
           selectList(this.model);
           return;
         }
-        this.host.space.captureSync();
-        this.host.space.updateBlock(this.model, {
+        this.host.page.captureSync();
+        this.host.page.updateBlock(this.model, {
           checked: !this.model.checked,
         });
       },
     });
-    const childrenContainer = BlockChildrenContainer(this.model, this.host);
+    const childrenContainer = BlockChildrenContainer(
+      this.model,
+      this.host,
+      () => this.requestUpdate()
+    );
     // For the first list item, we need to add a margin-top to make it align with the text
     const shouldAddMarginTop = index === 0 && deep === 0;
 
@@ -95,6 +97,6 @@ export class ListBlockComponent extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'list-block': ListBlockComponent;
+    'affine-list': ListBlockComponent;
   }
 }

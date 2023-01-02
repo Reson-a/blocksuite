@@ -7,12 +7,15 @@
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:react-hooks/recommended"
+    "plugin:react-hooks/recommended",
+    "plugin:wc/recommended",
+    "plugin:lit/recommended"
   ],
   "ignorePatterns": [
     "packages/store/dist/*",
     "packages/blocks/dist/*",
     "packages/editor/dist/*",
+    "packages/react/dist/*",
     "packages/playground/dist/assets/*"
   ],
   "overrides": [
@@ -37,5 +40,23 @@
     "sourceType": "module"
   },
   "plugins": ["react", "@typescript-eslint"],
-  "rules": {}
+  "rules": {
+    "@typescript-eslint/no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/dist", "**/dist/**"],
+            "message": "Don't import from dist",
+            "allowTypeImports": false
+          },
+          {
+            "group": ["**/src", "**/src/**"],
+            "message": "Don't import from src",
+            "allowTypeImports": false
+          }
+        ]
+      }
+    ]
+  }
 }

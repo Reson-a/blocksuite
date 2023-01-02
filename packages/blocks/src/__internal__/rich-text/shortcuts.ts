@@ -1,7 +1,12 @@
 import type { BaseBlockModel } from '@blocksuite/store';
-import type Quill from 'quill';
+import type { Quill } from 'quill';
 import type { RangeStatic } from 'quill';
-import { ALLOW_DEFAULT, PREVENT_DEFAULT } from '..';
+import {
+  ALLOW_DEFAULT,
+  assertExists,
+  getDefaultPageBlock,
+  PREVENT_DEFAULT,
+} from '../index.js';
 
 type Match = {
   name: string;
@@ -63,7 +68,7 @@ export class Shortcuts {
         }
 
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           bold: true,
           italic: true,
@@ -100,7 +105,7 @@ export class Shortcuts {
           return PREVENT_DEFAULT;
         }
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           bold: true,
         });
@@ -136,7 +141,7 @@ export class Shortcuts {
         }
 
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           italic: true,
         });
@@ -172,7 +177,7 @@ export class Shortcuts {
         }
 
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           strike: true,
         });
@@ -208,7 +213,7 @@ export class Shortcuts {
         }
 
         model.text?.insert(' ', selection.index);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           underline: true,
         });
@@ -225,7 +230,7 @@ export class Shortcuts {
     },
     {
       name: 'code',
-      pattern: /(?:`)(.+?)(?:`)$/g,
+      pattern: /(?:`)([^`]+?)(?:`)$/g,
       action: (
         model: BaseBlockModel,
         quill: Quill,
@@ -245,7 +250,7 @@ export class Shortcuts {
         }
 
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           code: true,
         });
@@ -256,6 +261,31 @@ export class Shortcuts {
         model.text?.delete(startIndex, 1);
         quill.format('code', false);
 
+        return ALLOW_DEFAULT;
+      },
+    },
+    {
+      name: 'codeblock',
+      pattern: /^```/g,
+      action: (
+        model: BaseBlockModel,
+        quill: Quill,
+        text: string,
+        selection: RangeStatic,
+        pattern: RegExp
+      ) => {
+        if (model.flavour === 'affine:paragraph' && model.type === 'quote') {
+          return PREVENT_DEFAULT;
+        }
+        const page = getDefaultPageBlock(model).page;
+        const parent = page.getParent(model);
+        assertExists(parent);
+        const index = parent.children.indexOf(model);
+        const blockProps = {
+          flavour: 'affine:code',
+        };
+        page.deleteBlock(model);
+        page.addBlock(blockProps, parent, index);
         return ALLOW_DEFAULT;
       },
     },
@@ -279,7 +309,7 @@ export class Shortcuts {
         const startIndex = selection.index - annotatedText.length;
 
         model.text?.insert(' ', startIndex + annotatedText.length);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(startIndex, annotatedText.length, {
           link: annotatedText,
         });
@@ -311,7 +341,7 @@ export class Shortcuts {
         const start = selection.index - matchedText.length;
 
         model.text?.insert(' ', selection.index);
-        model.space.captureSync();
+        model.page.captureSync();
         model.text?.format(start, hrefText.length, {
           link: hrefLink.slice(1, hrefLink.length - 1),
         });

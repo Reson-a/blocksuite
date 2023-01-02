@@ -14,6 +14,7 @@ export interface SelectionEvent extends IPoint {
   start: IPoint;
   delta: IPoint;
   raw: MouseEvent;
+  containerOffset: IPoint;
   keys: {
     shift: boolean;
     /** command or control */
@@ -29,19 +30,28 @@ function isFarEnough(a: IPoint, b: IPoint, d = 2) {
 
 function toSelectionEvent(
   e: MouseEvent,
-  rect: DOMRect | null,
+  getBoundingClientRect: () => DOMRect,
   startX: number,
   startY: number,
   last: SelectionEvent | null = null
 ): SelectionEvent {
+  const rect = getBoundingClientRect();
   const delta = { x: 0, y: 0 };
   const start = { x: startX, y: startY };
-  const offsetX = e.clientX - (rect?.left ?? 0);
-  const offsetY = e.clientY - (rect?.top ?? 0);
+  const offsetX = e.clientX - rect.left;
+  const offsetY = e.clientY - rect.top;
   const selectionEvent: SelectionEvent = {
     x: offsetX,
     y: offsetY,
     raw: e,
+    // absolute position is still **relative** to the nearest positioned ancestor.
+    //  In our case, it is the editor. For example, if there is padding/margin in editor,
+    //    then the correct absolute `x`/`y` of mouse position is `containerOffset.x - x`
+    // Refs: https://developer.mozilla.org/en-US/docs/Web/CSS/position#absolute_positioning
+    containerOffset: {
+      x: rect.left,
+      y: rect.top,
+    },
     delta,
     start,
     keys: {
@@ -59,17 +69,27 @@ function toSelectionEvent(
 }
 
 export function isPageTitle(e: Event) {
-  return e.target instanceof HTMLInputElement;
+  return (
+    e.target instanceof HTMLTextAreaElement &&
+    e.target.classList.contains('affine-default-page-block-title')
+  );
+}
+export function isInput(e: Event) {
+  return e.target instanceof HTMLTextAreaElement;
 }
 
 export function isTable(e: Event) {
   // TODO improve
   const tagName = (e.target as HTMLElement)?.tagName;
-  return tagName == 'AFFINE-TABLE' || tagName == 'AFFINE-GALLERY';
+  return (
+    tagName == 'AFFINE-TABLE' ||
+    tagName == 'AFFINE-GALLERY' ||
+    tagName == 'AFFINE-BOARD'
+  );
 }
 function tryPreventDefault(e: MouseEvent) {
   // workaround page title click
-  if (!isPageTitle(e) && !isTable(e)) {
+  if (!isInput(e) && !isTable(e)) {
     e.preventDefault();
   }
 }
@@ -89,21 +109,24 @@ export function initMouseEventHandlers(
   let startY = -Infinity;
   let isDragging = false;
   let last: SelectionEvent | null = null;
-  let rect: DOMRect | null = null;
+  const getBoundingClientRect: () => DOMRect = () =>
+    container.getBoundingClientRect();
 
   const mouseOutHandler = (e: MouseEvent) =>
-    onContainerMouseOut(toSelectionEvent(e, rect, startX, startY));
+    onContainerMouseOut(
+      toSelectionEvent(e, getBoundingClientRect, startX, startY)
+    );
 
   const mouseDownHandler = (e: MouseEvent) => {
     tryPreventDefault(e);
+    const rect = getBoundingClientRect();
 
-    rect = container.getBoundingClientRect();
     startX = e.clientX - rect.left;
     startY = e.clientY - rect.top;
     isDragging = false;
     // e.button is 0 means left button
     if (!e.button) {
-      last = toSelectionEvent(e, rect, startX, startY);
+      last = toSelectionEvent(e, getBoundingClientRect, startX, startY);
     }
     document.addEventListener('mouseup', mouseUpHandler);
     document.addEventListener('mouseout', mouseOutHandler);
@@ -111,8 +134,7 @@ export function initMouseEventHandlers(
 
   const mouseMoveHandler = (e: MouseEvent) => {
     tryPreventDefault(e);
-
-    if (!rect) rect = container.getBoundingClientRect();
+    const rect = getBoundingClientRect();
 
     const a = { x: startX, y: startY };
     const offsetX = e.clientX - rect.left;
@@ -120,7 +142,9 @@ export function initMouseEventHandlers(
     const b = { x: offsetX, y: offsetY };
 
     if (!last) {
-      onContainerMouseMove(toSelectionEvent(e, rect, startX, startY, last));
+      onContainerMouseMove(
+        toSelectionEvent(e, getBoundingClientRect, startX, startY, last)
+      );
       return;
     }
 
@@ -130,9 +154,13 @@ export function initMouseEventHandlers(
     }
 
     if (isDragging) {
-      onContainerDragMove(toSelectionEvent(e, rect, startX, startY, last));
-      onContainerMouseMove(toSelectionEvent(e, rect, startX, startY, last));
-      last = toSelectionEvent(e, rect, startX, startY);
+      onContainerDragMove(
+        toSelectionEvent(e, getBoundingClientRect, startX, startY, last)
+      );
+      onContainerMouseMove(
+        toSelectionEvent(e, getBoundingClientRect, startX, startY, last)
+      );
+      last = toSelectionEvent(e, getBoundingClientRect, startX, startY);
     }
   };
 
@@ -140,8 +168,13 @@ export function initMouseEventHandlers(
     tryPreventDefault(e);
 
     if (!isDragging)
-      onContainerClick(toSelectionEvent(e, rect, startX, startY));
-    else onContainerDragEnd(toSelectionEvent(e, rect, startX, startY, last));
+      onContainerClick(
+        toSelectionEvent(e, getBoundingClientRect, startX, startY)
+      );
+    else
+      onContainerDragEnd(
+        toSelectionEvent(e, getBoundingClientRect, startX, startY, last)
+      );
 
     startX = startY = -Infinity;
     isDragging = false;
@@ -154,11 +187,15 @@ export function initMouseEventHandlers(
   const contextMenuHandler = (e: MouseEvent) => {
     // e.preventDefault();
     // e.stopPropagation();
-    onContainerContextMenu(toSelectionEvent(e, rect, startX, startY));
+    onContainerContextMenu(
+      toSelectionEvent(e, getBoundingClientRect, startX, startY)
+    );
   };
 
   const dblClickHandler = (e: MouseEvent) => {
-    onContainerDblClick(toSelectionEvent(e, rect, startX, startY));
+    onContainerDblClick(
+      toSelectionEvent(e, getBoundingClientRect, startX, startY)
+    );
   };
 
   container.addEventListener('mousedown', mouseDownHandler);

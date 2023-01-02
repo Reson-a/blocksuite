@@ -1,3 +1,3 @@
-import './editor-container/editor-container';
+import './editor-container.js';
 
-export * from './editor-container/editor-container';
+export * from './editor-container.js';

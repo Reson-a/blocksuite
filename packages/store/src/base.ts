@@ -1,6 +1,12 @@
-import type { Space } from './space';
-import type { TextType } from './text-adapter';
-import { Signal } from './utils/signal';
+import type { Page } from './workspace/index.js';
+import type { TextType } from './text-adapter.js';
+import { Signal } from './utils/signal.js';
+
+// ported from lit
+interface StaticValue {
+  _$litStatic$: string;
+  r: unknown;
+}
 
 export interface IBaseBlockProps {
   flavour: string;
@@ -13,20 +19,24 @@ export interface IBaseBlockProps {
 }
 
 export class BaseBlockModel implements IBaseBlockProps {
-  space: Space;
+  static version: number;
+  flavour!: string;
+  tag!: StaticValue;
+  id: string;
+
+  page: Page;
   propsUpdated = new Signal();
   childrenUpdated = new Signal();
   childMap = new Map<string, number>();
 
-  flavour!: string;
   type!: string;
-  id: string;
   children: BaseBlockModel[];
   // TODO use schema
   text?: TextType;
+  sourceId?: string;
 
-  constructor(space: Space, props: Partial<IBaseBlockProps>) {
-    this.space = space;
+  constructor(page: Page, props: Partial<IBaseBlockProps>) {
+    this.page = page;
     this.id = props.id as string;
     this.children = [];
   }
@@ -65,7 +75,7 @@ export class BaseBlockModel implements IBaseBlockProps {
     return `${text}${childText}`;
   }
 
-  private _deltaLeaf2Html(deltaLeaf: Record<string, unknown>) {
+  _deltaLeaf2Html(deltaLeaf: Record<string, unknown>) {
     let text = deltaLeaf.insert;
     const attributes: Record<string, boolean> = deltaLeaf.attributes as Record<
       string,

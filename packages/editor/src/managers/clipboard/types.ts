@@ -22,6 +22,8 @@ export interface SelectedBlock {
   startPos?: number;
   endPos?: number;
   children: SelectedBlock[];
+  sourceId?: string;
+  caption?: string;
 }
 
 export type OpenBlockInfo = {
@@ -30,4 +32,8 @@ export type OpenBlockInfo = {
   text: Record<string, unknown>[];
   checked?: boolean;
   children: OpenBlockInfo[];
+  sourceId?: string;
+  caption?: string;
+  width?: number;
+  height?: number;
 };

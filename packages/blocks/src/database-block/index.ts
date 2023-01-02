@@ -1,3 +1,3 @@
-export * from './database-model';
-export * from './database-item-model';
-export * from './database-block';
+export * from './database-model.js';
+export * from './database-item-model.js';
+export * from './database-block.js';

@@ -1,9 +1,9 @@
 import { html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { createEvent } from '../../__internal__/utils';
-import { toast } from '../toast';
-import { ConfirmIcon, EditIcon, UnlinkIcon } from '../button';
-import { linkPopoverStyle } from './styles';
+import { createEvent } from '../../__internal__/utils/index.js';
+import { toast } from '../toast.js';
+import { ConfirmIcon, EditIcon, UnlinkIcon } from './icons.js';
+import { linkPopoverStyle } from './styles.js';
 
 export const ALLOWED_SCHEMES = [
   'http',
@@ -20,8 +20,50 @@ const MAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
 
 // For more detail see https://stackoverflow.com/questions/8667070/javascript-regular-expression-to-validate-url
-const URL_REGEX =
-  /^(?:(?:(?:https?|s?ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
+
+// For more detail see https://stackoverflow.com/questions/8667070/javascript-regular-expression-to-validate-url
+const URL_REGEX = new RegExp(
+  '^' +
+    // protocol identifier (optional)
+    // short syntax // still required
+    '(?:(?:(?:https?|ftp):)?\\/\\/)' +
+    // user:pass BasicAuth (optional)
+    '(?:\\S+(?::\\S*)?@)?' +
+    '(?:' +
+    // IP address exclusion
+    // private & local networks
+    '(?!(?:10|127)(?:\\.\\d{1,3}){3})' +
+    '(?!(?:169\\.254|192\\.168)(?:\\.\\d{1,3}){2})' +
+    '(?!172\\.(?:1[6-9]|2\\d|3[0-1])(?:\\.\\d{1,3}){2})' +
+    // IP address dotted notation octets
+    // excludes loopback network 0.0.0.0
+    // excludes reserved space >= 224.0.0.0
+    // excludes network & broadcast addresses
+    // (first & last IP address of each class)
+    '(?:[1-9]\\d?|1\\d\\d|2[01]\\d|22[0-3])' +
+    '(?:\\.(?:1?\\d{1,2}|2[0-4]\\d|25[0-5])){2}' +
+    '(?:\\.(?:[1-9]\\d?|1\\d\\d|2[0-4]\\d|25[0-4]))' +
+    '|' +
+    // host & domain names, may end with dot
+    // can be replaced by a shortest alternative
+    // (?![-_])(?:[-\\w\\u00a1-\\uffff]{0,63}[^-_]\\.)+
+    '(?:' +
+    '(?:' +
+    '[a-z0-9\\u00a1-\\uffff]' +
+    '[a-z0-9\\u00a1-\\uffff_-]{0,62}' +
+    ')?' +
+    '[a-z0-9\\u00a1-\\uffff]\\.' +
+    ')+' +
+    // TLD identifier name, may end with dot
+    '(?:[a-z\\u00a1-\\uffff]{2,}\\.?)' +
+    ')' +
+    // port number (optional)
+    '(?::\\d{2,5})?' +
+    // resource path (optional)
+    '(?:[/?#]\\S*)?' +
+    '$',
+  'i'
+);
 
 function normalizeUrl(url: string) {
   const hasScheme = ALLOWED_SCHEMES.some(scheme =>
@@ -116,7 +158,7 @@ export class LinkPopover extends LitElement {
     }
   }
 
-  private hide() {
+  private _hide() {
     this.dispatchEvent(
       new CustomEvent<LinkDetail>('updateLink', {
         detail: { type: 'cancel' },
@@ -124,7 +166,7 @@ export class LinkPopover extends LitElement {
     );
   }
 
-  private onConfirm() {
+  private _onConfirm() {
     if (this.disableConfirm) {
       return;
     }
@@ -147,23 +189,23 @@ export class LinkPopover extends LitElement {
     return;
   }
 
-  private onCopy(e: MouseEvent) {
+  private _onCopy(e: MouseEvent) {
     navigator.clipboard.writeText(this.previewLink);
     toast('Copied link to clipboard');
   }
 
-  private onUnlink(e: MouseEvent) {
+  private _onUnlink(e: MouseEvent) {
     this.dispatchEvent(createEvent('updateLink', { type: 'remove' }));
   }
 
-  private onEdit(e: MouseEvent) {
+  private _onEdit(e: MouseEvent) {
     this.dispatchEvent(createEvent('editLink', null));
     this.disableConfirm = false;
   }
 
-  private onKeyup(e: KeyboardEvent) {
+  private _onKeyup(e: KeyboardEvent) {
     if (e.key === 'Enter') {
-      this.onConfirm();
+      this._onConfirm();
     }
     if (!this.linkInput) {
       throw new Error('Failed to update link! Link input not found!');
@@ -177,8 +219,8 @@ export class LinkPopover extends LitElement {
     return html`<icon-button
       class="affine-confirm-button"
       ?disabled=${this.disableConfirm}
-      @click=${this.onConfirm}
-      >${ConfirmIcon()}</icon-button
+      @click=${this._onConfirm}
+      >${ConfirmIcon}</icon-button
     >`;
   }
 
@@ -191,7 +233,7 @@ export class LinkPopover extends LitElement {
         spellcheck="false"
         placeholder="Paste or type a link"
         value=${this.previewLink}
-        @keyup=${this.onKeyup}
+        @keyup=${this._onKeyup}
       />
       <span class="affine-link-popover-dividing-line"></span>
       ${this.confirmBtnTemplate()}
@@ -200,17 +242,17 @@ export class LinkPopover extends LitElement {
 
   previewTemplate() {
     return html`<div class="affine-link-popover">
-      <div class="affine-link-preview has-tool-tip" @click=${this.onCopy}>
+      <div class="affine-link-preview has-tool-tip" @click=${this._onCopy}>
         <tool-tip inert role="tooltip">Click to copy link</tool-tip>
         ${this.previewLink}
       </div>
       <span class="affine-link-popover-dividing-line"></span>
-      <icon-button class="has-tool-tip" @click=${this.onUnlink}>
-        ${UnlinkIcon()}
+      <icon-button class="has-tool-tip" @click=${this._onUnlink}>
+        ${UnlinkIcon}
         <tool-tip inert role="tooltip">Remove</tool-tip>
       </icon-button>
-      <icon-button class="has-tool-tip" @click=${this.onEdit}>
-        ${EditIcon()}
+      <icon-button class="has-tool-tip" @click=${this._onEdit}>
+        ${EditIcon}
         <tool-tip inert role="tooltip">Edit link</tool-tip>
       </icon-button>
     </div>`;
@@ -235,32 +277,38 @@ export class LinkPopover extends LitElement {
    */
   editTemplate() {
     return html`<div class="affine-link-edit-popover">
-      <label class="affine-edit-text-text" for="text-input">Text</label>
-      <input
-        class="affine-edit-text-input"
-        id="text-input"
-        type="text"
-        placeholder="Enter text"
-        value=${this.text}
-        @keyup=${this.onKeyup}
-      />
-      <label class="affine-edit-link-text" for="link-input">Link</label>
-      <input
-        id="link-input"
-        class="affine-edit-link-input"
-        type="text"
-        spellcheck="false"
-        placeholder="Paste or type a link"
-        value=${this.previewLink}
-        @keyup=${this.onKeyup}
-      />
+      <div class="affine-edit-text-area">
+        <input
+          class="affine-edit-text-input"
+          id="text-input"
+          type="text"
+          placeholder="Enter text"
+          value=${this.text}
+          @keyup=${this._onKeyup}
+        />
+        <span class="affine-link-popover-dividing-line"></span>
+        <label class="affine-edit-text-text" for="text-input">Text</label>
+      </div>
+      <div class="affine-edit-link-area">
+        <input
+          id="link-input"
+          class="affine-edit-link-input"
+          type="text"
+          spellcheck="false"
+          placeholder="Paste or type a link"
+          value=${this.previewLink}
+          @keyup=${this._onKeyup}
+        />
+        <span class="affine-link-popover-dividing-line"></span>
+        <label class="affine-edit-link-text" for="link-input">Link</label>
+      </div>
       ${this.confirmBtnTemplate()}
     </div>`;
   }
 
   render() {
     const mask = this.showMask
-      ? html`<div class="overlay-mask" @click="${this.hide}"></div>`
+      ? html`<div class="overlay-mask" @click="${this._hide}"></div>`
       : html``;
 
     const popover =

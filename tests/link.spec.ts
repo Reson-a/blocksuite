@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { expect, Page, test } from '@playwright/test';
 import {
+  dragBetweenIndices,
   enterPlaygroundRoom,
   focusRichText,
-  initEmptyState,
+  initEmptyParagraphState,
   pressEnter,
-  selectAllByKeyboard,
+  switchReadonly,
   withCtrlOrMeta,
-} from './utils/actions';
-import { assertStoreMatchJSX } from './utils/asserts';
+} from './utils/actions/index.js';
+import { assertStoreMatchJSX } from './utils/asserts.js';
 
 const pressCreateLinkShortCut = async (page: Page) => {
   await withCtrlOrMeta(page, async () => {
@@ -21,31 +22,31 @@ test('basic link', async ({ page }) => {
   const linkText = 'linkText';
   const link = 'http://example.com';
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type(linkText);
 
   // Create link
-  await selectAllByKeyboard(page);
+  await dragBetweenIndices(page, [0, 0], [0, 8]);
   await pressCreateLinkShortCut(page);
 
-  const linkPopoverLocator = page.locator('.overlay-container');
-  expect(await linkPopoverLocator.isVisible()).toBe(true);
+  const linkPopoverLocator = page.locator('.affine-link-popover');
+  await expect(linkPopoverLocator).toBeVisible();
   const linkPopoverInput = page.locator('.affine-link-popover-input');
-  expect(await linkPopoverInput.isVisible()).toBe(true);
+  await expect(linkPopoverInput).toBeVisible();
   await page.keyboard.type(link);
   await pressEnter(page);
-  expect(await linkPopoverLocator.isVisible()).toBe(false);
+  await expect(linkPopoverLocator).not.toBeVisible();
 
   const linkLocator = page.locator(`text="${linkText}"`);
   await expect(linkLocator).toHaveAttribute('href', link);
 
   // Hover link
-  expect(await linkPopoverLocator.isVisible()).toBe(false);
+  await expect(linkPopoverLocator).not.toBeVisible();
   await linkLocator.hover();
   // wait for popover delay open
   await page.waitForTimeout(200);
-  expect(await linkPopoverLocator.isVisible()).toBe(true);
+  await expect(linkPopoverLocator).toBeVisible();
 
   // Edit link
   const text2 = 'link2';
@@ -55,7 +56,7 @@ test('basic link', async ({ page }) => {
   await pressEnter(page);
 
   const editLinkPopoverLocator = page.locator('.affine-link-edit-popover');
-  expect(await editLinkPopoverLocator.isVisible()).toBe(true);
+  await expect(editLinkPopoverLocator).toBeVisible();
   await page.keyboard.press('Tab');
   await page.keyboard.type(text2);
   await page.keyboard.press('Tab');
@@ -88,28 +89,21 @@ test('basic link', async ({ page }) => {
   );
 });
 
-const createLinkBlock = async (page: Page, str: string, link: string) => {
+async function createLinkBlock(page: Page, str: string, link: string) {
   const id = await page.evaluate(
     ([str, link]) => {
-      const space = window.store
-        .createSpace('page-test')
-        .register(window.blockSchema);
-      const editor = document.createElement('editor-container');
-      // @ts-ignore
-      editor.space = space;
-      document.body.appendChild(editor);
-
-      const pageId = space.addBlock({
+      const { page } = window;
+      const pageId = page.addBlock({
         flavour: 'affine:page',
         title: 'title',
       });
-      const groupId = space.addBlock({ flavour: 'affine:group' }, pageId);
+      const groupId = page.addBlock({ flavour: 'affine:group' }, pageId);
 
-      const text = space.Text.fromDelta(space, [
+      const text = page.Text.fromDelta(page, [
         { insert: 'Hello' },
         { insert: str, attributes: { link } },
       ]);
-      const id = space.addBlock(
+      const id = page.addBlock(
         { flavour: 'affine:paragraph', type: 'text', text: text },
         groupId
       );
@@ -118,13 +112,12 @@ const createLinkBlock = async (page: Page, str: string, link: string) => {
     [str, link]
   );
   return id;
-};
+}
 
 test('text added after a link should not have link formatting', async ({
   page,
 }) => {
   await enterPlaygroundRoom(page);
-  // await initEmptyState(page);
   const id = await createLinkBlock(page, 'link text', 'http://example.com');
   await focusRichText(page, 0);
   await page.keyboard.type('after link');
@@ -156,4 +149,53 @@ test('text added after a link should not have link formatting', async ({
 />`,
     id
   );
+});
+
+test('type character in link should not jump out link node', async ({
+  page,
+}) => {
+  await enterPlaygroundRoom(page);
+  const id = await createLinkBlock(page, 'link text', 'http://example.com');
+  await focusRichText(page, 0);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.type('IN_LINK');
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:paragraph
+  prop:text={
+    <>
+      <text
+        insert="Hello"
+      />
+      <text
+        insert="link texIN_LINKt"
+        link="http://example.com"
+      />
+    </>
+  }
+  prop:type="text"
+/>`,
+    id
+  );
+});
+
+test('readonly mode should not trigger link hover', async ({ page }) => {
+  await enterPlaygroundRoom(page);
+  const linkText = 'linkText';
+  await createLinkBlock(page, 'linkText', 'http://example.com');
+  await focusRichText(page, 0);
+  const linkLocator = page.locator(`text="${linkText}"`);
+
+  // Hover link
+  const linkPopoverLocator = page.locator('.affine-link-popover');
+  await linkLocator.hover();
+  await expect(linkPopoverLocator).toBeVisible();
+  await switchReadonly(page);
+
+  // XXX Wait for readonly delay
+  await page.waitForTimeout(300);
+
+  await linkLocator.hover();
+  await expect(linkPopoverLocator).not.toBeVisible();
 });

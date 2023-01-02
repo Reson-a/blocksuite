@@ -1,8 +1,13 @@
-import { CLIPBOARD_MIMETYPE, OpenBlockInfo, SelectedBlock } from './types';
-import { ClipItem } from './clip-item';
-import type { EditorContainer } from '../../components';
-import { ListBlockModel } from '@blocksuite/blocks';
-import { SelectionUtils } from '@blocksuite/blocks';
+import {
+  EmbedBlockModel,
+  getCurrentRange,
+  ListBlockModel,
+  matchFlavours,
+  SelectionUtils,
+} from '@blocksuite/blocks';
+import type { EditorContainer } from '../../components/index.js';
+import { ClipboardItem } from './item.js';
+import { CLIPBOARD_MIMETYPE, OpenBlockInfo, SelectedBlock } from './types.js';
 
 export class CopyCutManager {
   private _editor: EditorContainer;
@@ -23,9 +28,6 @@ export class CopyCutManager {
   */
 
   public handleCopy(e: ClipboardEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
     const clips = this._getClipItems();
     if (!clips.length) {
       return;
@@ -60,8 +62,8 @@ export class CopyCutManager {
   }
 
   private _getClipItems() {
-    const clips: ClipItem[] = [];
-    const selectionInfo = SelectionUtils.getSelectInfo(this._editor.space);
+    const clips: ClipboardItem[] = [];
+    const selectionInfo = SelectionUtils.getSelectInfo(this._editor.page);
     const selectedBlocks = selectionInfo.selectedBlocks;
 
     const affineClip = this._getCustomClip(selectedBlocks);
@@ -76,11 +78,13 @@ export class CopyCutManager {
     return clips;
   }
 
-  private _getCustomClip(selectedBlocks: SelectedBlock[]): ClipItem | null {
+  private _getCustomClip(
+    selectedBlocks: SelectedBlock[]
+  ): ClipboardItem | null {
     const clipInfos = selectedBlocks.map(selectedBlock =>
       this._getClipInfoBySelectionInfo(selectedBlock)
     );
-    return new ClipItem(
+    return new ClipboardItem(
       CLIPBOARD_MIMETYPE.BLOCKS_CLIP_WRAPPED,
       JSON.stringify({
         data: clipInfos,
@@ -88,43 +92,52 @@ export class CopyCutManager {
     );
   }
 
-  private _getHtmlClip(selectedBlocks: SelectedBlock[]): ClipItem | null {
+  private _getHtmlClip(selectedBlocks: SelectedBlock[]): ClipboardItem | null {
     const htmlText = this._editor.contentParser.block2Html(selectedBlocks);
-    return new ClipItem(CLIPBOARD_MIMETYPE.HTML, htmlText);
+    return new ClipboardItem(CLIPBOARD_MIMETYPE.HTML, htmlText);
   }
 
-  private _getTextClip(selectedBlocks: SelectedBlock[]): ClipItem | null {
+  private _getTextClip(selectedBlocks: SelectedBlock[]): ClipboardItem | null {
     const text = this._editor.contentParser.block2Text(selectedBlocks);
-    return new ClipItem(CLIPBOARD_MIMETYPE.TEXT, text);
+    return new ClipboardItem(CLIPBOARD_MIMETYPE.TEXT, text);
   }
 
   private _getClipInfoBySelectionInfo(
     selectedBlock: SelectedBlock
   ): OpenBlockInfo | null {
-    const model = this._editor.space.getBlockById(selectedBlock.id);
+    const model = this._editor.page.getBlockById(selectedBlock.id);
     if (!model) {
       return null;
     }
 
     let { flavour, type } = model;
     let delta = [];
-    if (model.flavour === 'affine:page') {
+    if (matchFlavours(model, ['affine:page'])) {
       flavour = 'affine:paragraph';
       type = 'text';
       const text = model.block2Text(
         '',
-        selectedBlock?.startPos,
-        selectedBlock?.endPos
+        selectedBlock.startPos,
+        selectedBlock.endPos
       );
       delta = [
         {
           insert: text,
         },
       ];
+    } else if (matchFlavours(model, ['affine:embed'])) {
+      flavour = 'affine:embed';
+      type = 'image';
+      const text = model.block2Text('', 0, 0);
+      delta = [
+        {
+          insert: text,
+        },
+      ];
     } else {
-      delta = model?.text?.sliceToDelta(
-        selectedBlock?.startPos || 0,
-        selectedBlock?.endPos
+      delta = model.text?.sliceToDelta(
+        selectedBlock.startPos || 0,
+        selectedBlock.endPos
       );
     }
 
@@ -133,34 +146,50 @@ export class CopyCutManager {
       const childInfo = this._getClipInfoBySelectionInfo(child);
       childInfo && children.push(childInfo);
     });
-
-    return {
+    const result = {
       flavour: flavour,
       type: type,
       text: delta,
       checked: model instanceof ListBlockModel ? model.checked : undefined,
       children: children,
     };
+    if (model instanceof EmbedBlockModel) {
+      Object.assign(result, {
+        sourceId: model.sourceId,
+        caption: model.caption,
+        width: model.width,
+        height: model.height,
+      });
+    }
+
+    return result;
   }
 
-  private _copyToClipboard(e: ClipboardEvent, clipItems: ClipItem[]) {
+  private _copyToClipboard(e: ClipboardEvent, clipItems: ClipboardItem[]) {
     const clipboardData = e.clipboardData;
     if (clipboardData) {
       try {
         clipItems.forEach(clip => {
           clipboardData.setData(clip.mimeType, clip.data);
         });
+        e.preventDefault();
+        e.stopPropagation();
       } catch (e) {
         // TODO handle exception
       }
     } else {
-      this._copyToClipboardFromPc(clipItems);
+      if (this._copyToClipboardFromPc(clipItems)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     }
   }
 
   // TODO: Optimization
   // TODO: is not compatible with safari
-  private _copyToClipboardFromPc(clips: ClipItem[]) {
+  private _copyToClipboardFromPc(clips: ClipboardItem[]): boolean {
+    const curRange = getCurrentRange();
+
     let success = false;
     const tempElem = document.createElement('textarea');
     tempElem.value = 'temp';
@@ -187,6 +216,7 @@ export class CopyCutManager {
     } finally {
       tempElem.removeEventListener('copy', listener);
       document.body.removeChild(tempElem);
+      SelectionUtils.resetNativeSelection(curRange);
     }
     return success;
   }

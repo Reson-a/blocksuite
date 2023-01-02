@@ -19,6 +19,7 @@ async function keyUpCtrlOrMeta(page: Page) {
     await page.keyboard.up('Control');
   }
 }
+
 async function keyDownOptionMeta(page: Page) {
   if (IS_MAC) {
     await page.keyboard.down('Alt');
@@ -72,7 +73,6 @@ export async function redoByKeyboard(page: Page) {
 export async function selectAllByKeyboard(page: Page) {
   await keyDownCtrlOrMeta(page);
   await page.keyboard.press('a');
-  await page.keyboard.up('a');
   await keyUpCtrlOrMeta(page);
 }
 
@@ -151,40 +151,33 @@ export async function copyByKeyboard(page: Page) {
 }
 
 export async function cutByKeyboard(page: Page) {
+  const doesEditorActive = await page.evaluate(
+    () => document.activeElement?.closest('editor-container') != null
+  );
+  if (!doesEditorActive) {
+    await page.click('editor-container');
+  }
   await keyDownCtrlOrMeta(page);
   await page.keyboard.press('x', { delay: 50 });
   await keyUpCtrlOrMeta(page);
 }
 
 export async function pasteByKeyboard(page: Page) {
+  const doesEditorActive = await page.evaluate(() =>
+    document.activeElement?.closest('editor-container')
+  );
+  if (!doesEditorActive) {
+    await page.click('editor-container');
+  }
   await keyDownCtrlOrMeta(page);
   await page.keyboard.press('v', { delay: 50 });
   await keyUpCtrlOrMeta(page);
 }
 
-/**
- * Focus on the specified line, the title is line 0 and so on.
- * If line is not specified, focus on the title
- *
- * The implementation is depends on the keyboard behavior.
- */
-export async function focusLine(page: Page, line = 0, end = true) {
-  // Focus on the title
-  await page.click('input.affine-default-page-block-title');
-  if (!line) {
-    if (end) {
-      await page.keyboard.press('End');
-    }
-    return;
-  }
-  // Workaround move cursor from title to text only can use Tab, remove it after fixed
-  await page.keyboard.press('Tab');
-  line--;
-  // End of workaround
-  while (line-- > 0) {
-    await page.keyboard.press('ArrowDown');
-  }
-  if (end) {
-    await page.keyboard.press('End');
-  }
+export async function createCodeBlock(page: Page) {
+  await keyDownCtrlOrMeta(page);
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('c');
+  await page.keyboard.up('Alt');
+  await keyUpCtrlOrMeta(page);
 }

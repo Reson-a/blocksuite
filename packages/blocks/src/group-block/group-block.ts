@@ -1,16 +1,17 @@
 /// <reference types="vite/client" />
-import { LitElement, html, css, unsafeCSS } from 'lit';
+import { html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { GroupBlockModel } from './group-model';
+import type { GroupBlockModel } from './group-model.js';
 import {
-  BlockChildrenContainer,
   BLOCK_ID_ATTR,
   type BlockHost,
-} from '../__internal__';
-import style from './style.css';
+  NonShadowLitElement,
+  BlockChildrenContainer,
+} from '../__internal__/index.js';
+import style from './style.css?inline';
 
-@customElement('group-block')
-export class GroupBlockComponent extends LitElement {
+@customElement('affine-group')
+export class GroupBlockComponent extends NonShadowLitElement {
   static styles = css`
     ${unsafeCSS(style)}
   `;
@@ -25,11 +26,6 @@ export class GroupBlockComponent extends LitElement {
   @property()
   host!: BlockHost;
 
-  // disable shadow DOM to workaround quill
-  createRenderRoot() {
-    return this;
-  }
-
   firstUpdated() {
     this.model.propsUpdated.on(() => this.requestUpdate());
     this.model.childrenUpdated.on(() => this.requestUpdate());
@@ -38,7 +34,11 @@ export class GroupBlockComponent extends LitElement {
   render() {
     this.setAttribute(BLOCK_ID_ATTR, this.model.id);
 
-    const childrenContainer = BlockChildrenContainer(this.model, this.host);
+    const childrenContainer = BlockChildrenContainer(
+      this.model,
+      this.host,
+      () => this.requestUpdate()
+    );
 
     return html`
       <div class="affine-group-block-container">${childrenContainer}</div>
@@ -48,6 +48,6 @@ export class GroupBlockComponent extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'group-block': GroupBlockComponent;
+    'affine-group': GroupBlockComponent;
   }
 }

@@ -12,36 +12,37 @@ import {
   pressEnter,
   initThreeParagraphs,
   dragBetweenIndices,
-  initEmptyState,
-  convertToBulletedListByClick,
+  initEmptyParagraphState,
   formatType,
-} from './utils/actions';
+  clickBlockTypeMenuItem,
+} from './utils/actions/index.js';
 import {
   assertRichTexts,
+  assertStoreMatchJSX,
   assertTextFormat,
   assertTypeFormat,
-} from './utils/asserts';
+} from './utils/asserts.js';
 
 test('rich-text hotkey scope on single press', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
   await pressEnter(page);
   await page.keyboard.type('world');
   await assertRichTexts(page, ['hello', 'world']);
 
-  await selectAllByKeyboard(page); // first select all in rich text
+  await dragBetweenIndices(page, [0, 0], [1, 5]);
   await page.keyboard.press('Backspace');
   await assertRichTexts(page, ['\n']);
 });
 
 test('single line rich-text inline code hotkey', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
-  await selectAllByKeyboard(page);
+  await dragBetweenIndices(page, [0, 0], [0, 5]);
   await inlineCode(page);
   await assertTextFormat(page, 0, 0, { code: true });
 
@@ -52,18 +53,18 @@ test('single line rich-text inline code hotkey', async ({ page }) => {
   await redoByKeyboard(page);
   await assertTextFormat(page, 0, 0, { code: true });
 
+  // the format should be removed after trigger the hotkey again
   await inlineCode(page);
-  await assertTextFormat(page, 0, 0, { code: true });
+  await assertTextFormat(page, 0, 0, {});
 });
 
 test('type character jump out code node', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('Hello');
   await selectAllByKeyboard(page);
   await inlineCode(page);
-  await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.type('block suite', { delay: 10 });
   // block suite should not be code
@@ -72,7 +73,7 @@ test('type character jump out code node', async ({ page }) => {
 
 test('multi line rich-text inline code hotkey', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  const { groupId } = await initEmptyParagraphState(page);
   await initThreeParagraphs(page);
   await assertRichTexts(page, ['123', '456', '789']);
 
@@ -81,33 +82,137 @@ test('multi line rich-text inline code hotkey', async ({ page }) => {
   await dragBetweenIndices(page, [0, 1], [2, 2]);
   await inlineCode(page);
 
-  // split at 0,1
-  await assertTextFormat(page, 0, 1, {});
-  await assertTextFormat(page, 0, 2, { code: true });
-
-  // split at 2,2
-  await assertTextFormat(page, 2, 2, {});
-  await assertTextFormat(page, 2, 3, {});
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:group
+  prop:xywh="[0,0,720,112]"
+>
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          insert="1"
+        />
+        <text
+          code={true}
+          insert="23"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          code={true}
+          insert="456"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          code={true}
+          insert="78"
+        />
+        <text
+          insert="9"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+</affine:group>`,
+    groupId
+  );
 
   await undoByClick(page);
-  await assertTextFormat(page, 0, 1, {});
-  await assertTextFormat(page, 0, 2, {});
-  await assertTextFormat(page, 2, 2, {});
-  await assertTextFormat(page, 2, 3, {});
+
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:group
+  prop:xywh="[0,0,720,112]"
+>
+  <affine:paragraph
+    prop:text="123"
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text="456"
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text="789"
+    prop:type="text"
+  />
+</affine:group>`,
+    groupId
+  );
 
   await redoByClick(page);
-  await assertTextFormat(page, 0, 1, {});
-  await assertTextFormat(page, 0, 2, { code: true });
-  await assertTextFormat(page, 2, 2, { code: true });
-  await assertTextFormat(page, 2, 3, {});
+
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:group
+  prop:xywh="[0,0,720,112]"
+>
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          insert="1"
+        />
+        <text
+          code={true}
+          insert="23"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          code={true}
+          insert="456"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+  <affine:paragraph
+    prop:text={
+      <>
+        <text
+          code={true}
+          insert="78"
+        />
+        <text
+          insert="9"
+        />
+      </>
+    }
+    prop:type="text"
+  />
+</affine:group>`,
+    groupId
+  );
 });
 
 test('single line rich-text strikethrough hotkey', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
-  await selectAllByKeyboard(page);
+  await dragBetweenIndices(page, [0, 0], [0, 5]);
   await strikethrough(page);
   await assertTextFormat(page, 0, 0, { strike: true });
 
@@ -117,17 +222,17 @@ test('single line rich-text strikethrough hotkey', async ({ page }) => {
   await redoByClick(page);
   await assertTextFormat(page, 0, 0, { strike: true });
 
-  // trigger hotkey twice
+  // the format should be removed after trigger the hotkey again
   await strikethrough(page);
-  await assertTextFormat(page, 0, 0, { strike: true });
+  await assertTextFormat(page, 0, 0, {});
 });
 
 test('format list to h1', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
 
   await focusRichText(page, 0);
-  await convertToBulletedListByClick(page);
+  await clickBlockTypeMenuItem(page, 'Bulleted List');
   await page.keyboard.type('aa');
   await focusRichText(page, 0);
   await formatType(page);

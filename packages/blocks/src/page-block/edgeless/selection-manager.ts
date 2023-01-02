@@ -1,25 +1,39 @@
-import type { GroupBlockModel } from '../../group-block';
-import type { EdgelessContainer } from './edgeless-page-block';
 import {
   SelectionEvent,
   initMouseEventHandlers,
-  resetNativeSelection,
-  noop,
-  caretRangeFromPoint,
-  handleNativeRangeDragMove,
-  handleNativeRangeClick,
-} from '../../__internal__';
-import { getSelectionBoxBound, initWheelEventHandlers, pick } from './utils';
-import { repairContextMenuRange } from '../utils/cursor';
+  MouseMode,
+  RootBlockModel,
+  matchFlavours,
+  getBlockById,
+} from '../../__internal__/index.js';
+import { initWheelEventHandlers } from './utils.js';
+import type { EdgelessPageBlockComponent } from './edgeless-page-block.js';
+import { DefaultSelectionController } from './selection-manager/default.js';
+import { ShapeSelectionController } from './selection-manager/shape.js';
+import type {
+  HoverState,
+  SelectionController,
+} from './selection-manager/index.js';
+import type { ShapeBlockModel } from '../../shape-block/index.js';
+import type { Disposable } from '@blocksuite/store';
+
+export { HoverState };
 
 interface NoneBlockSelectionState {
+  // No selected block
   type: 'none';
 }
 
 interface SingleBlockSelectionState {
+  // There is one block that be selected
   type: 'single';
-  selected: GroupBlockModel;
+  // Which block that be selected
+  selected: RootBlockModel;
+  // Current viewport
+  viewport: ViewportState;
+  // Rect of the selected block
   rect: DOMRect;
+  // True if the block is active (like double click)
   active: boolean;
 }
 
@@ -27,12 +41,7 @@ export type BlockSelectionState =
   | NoneBlockSelectionState
   | SingleBlockSelectionState;
 
-interface HoverState {
-  rect: DOMRect;
-  block: GroupBlockModel;
-}
-
-interface FrameSelectionState {
+export interface SelectionArea {
   start: DOMPoint;
   end: DOMPoint;
 }
@@ -117,30 +126,53 @@ export class ViewportState {
 }
 
 export class EdgelessSelectionManager {
-  private _container: EdgelessContainer;
+  private _mouseMode: MouseMode = {
+    type: 'default',
+  };
+  private _container: EdgelessPageBlockComponent;
+  private _selectionManagers: Record<MouseMode['type'], SelectionController>;
+
   private _mouseDisposeCallback: () => void;
+  private _selectionUpdateCallback: Disposable;
   private _wheelDisposeCallback: () => void;
 
-  private _blockSelectionState: BlockSelectionState = {
-    type: 'none',
-  };
-  private _startRange: Range | null = null;
-  private _hoverState: HoverState | null = null;
-  private _frameSelectionState: FrameSelectionState | null = null;
+  private _previousSelectedShape: ShapeBlockModel | null = null;
 
-  get blockSelectionState() {
-    return this._blockSelectionState;
+  get isActive() {
+    return this.currentController.isActive;
   }
 
-  get hoverRect() {
-    if (!this._hoverState) return null;
-    return this._hoverState.rect;
+  get mouseMode() {
+    return this._mouseMode;
+  }
+
+  set mouseMode(mode: MouseMode) {
+    this._mouseMode = mode;
+    // sync mouse mode
+    this._selectionManagers[this._mouseMode.type].mouseMode = this._mouseMode;
+  }
+
+  get blockSelectionState() {
+    return this.currentController.blockSelectionState;
+  }
+
+  get currentController() {
+    return this._selectionManagers[this.mouseMode.type];
+  }
+
+  get hoverState() {
+    if (!this.currentController.hoverState) return null;
+    return this.currentController.hoverState;
+  }
+
+  get isHoveringShape(): boolean {
+    return this.currentController.hoverState?.block.flavour === 'affine:shape';
   }
 
   get frameSelectionRect() {
-    if (!this._frameSelectionState) return null;
+    if (!this.currentController.frameSelectionState) return null;
 
-    const { start, end } = this._frameSelectionState;
+    const { start, end } = this.currentController.frameSelectionState;
     const minX = Math.min(start.x, end.x);
     const minY = Math.min(start.y, end.y);
     const maxX = Math.max(start.x, end.x);
@@ -148,8 +180,12 @@ export class EdgelessSelectionManager {
     return new DOMRect(minX, minY, maxX - minX, maxY - minY);
   }
 
-  constructor(container: EdgelessContainer) {
+  constructor(container: EdgelessPageBlockComponent) {
     this._container = container;
+    this._selectionManagers = {
+      default: new DefaultSelectionController(this._container),
+      shape: new ShapeSelectionController(this._container),
+    };
     this._mouseDisposeCallback = initMouseEventHandlers(
       this._container,
       this._onContainerDragStart,
@@ -161,196 +197,81 @@ export class EdgelessSelectionManager {
       this._onContainerMouseOut,
       this._onContainerContextMenu
     );
+    this._selectionUpdateCallback = this._container.signals.updateSelection.on(
+      state => {
+        if (this._previousSelectedShape) {
+          const element = getBlockById<'affine-shape'>(
+            this._previousSelectedShape.id
+          );
+          if (element) {
+            element.selected = false;
+          }
+          this._previousSelectedShape = null;
+        }
+        if (state.type === 'single') {
+          if (matchFlavours(state.selected, ['affine:shape'])) {
+            const element = getBlockById<'affine-shape'>(state.selected.id);
+            if (element) {
+              element.selected = true;
+            }
+            this._previousSelectedShape = state.selected as ShapeBlockModel;
+          }
+        }
+      }
+    );
     this._wheelDisposeCallback = initWheelEventHandlers(container);
   }
 
-  private get _space() {
-    return this._container.space;
-  }
-
-  private get _blocks(): GroupBlockModel[] {
-    return (this._space.root?.children as GroupBlockModel[]) ?? [];
-  }
-
-  get isActive() {
-    return (
-      this._blockSelectionState.type === 'single' &&
-      this._blockSelectionState.active
-    );
-  }
-
-  private _updateFrameSelectionState(x: number, y: number) {
-    if (this._frameSelectionState) {
-      this._frameSelectionState.end = new DOMPoint(x, y);
-    }
-    if (this._hoverState) {
-      this._blockSelectionState = {
-        type: 'single',
-        selected: this._hoverState.block,
-        rect: this._hoverState.rect,
-        active: false,
-      };
-    }
-  }
-
-  private _updateHoverState(hoverBlock: GroupBlockModel | null) {
-    if (hoverBlock) {
-      this._hoverState = {
-        rect: getSelectionBoxBound(this._container.viewport, hoverBlock.xywh),
-        block: hoverBlock,
-      };
-    } else {
-      this._hoverState = null;
-    }
-  }
-
-  private _handleClickOnSelected(selected: GroupBlockModel, e: SelectionEvent) {
-    const { viewport } = this._container;
-
-    switch (this.blockSelectionState.type) {
-      case 'none':
-        this._blockSelectionState = {
-          type: 'single',
-          active: false,
-          selected,
-          rect: getSelectionBoxBound(viewport, selected.xywh),
-        };
-        this._container.signals.updateSelection.emit(this.blockSelectionState);
-        break;
-      case 'single':
-        if (this.blockSelectionState.selected === selected) {
-          this.blockSelectionState.active = true;
-          this._container.signals.updateSelection.emit(
-            this.blockSelectionState
-          );
-        } else {
-          this._blockSelectionState = {
-            type: 'single',
-            active: false,
-            selected,
-            rect: getSelectionBoxBound(viewport, selected.xywh),
-          };
-          this._container.signals.updateSelection.emit(
-            this.blockSelectionState
-          );
-        }
-        handleNativeRangeClick(this._space, e);
-        break;
-    }
-  }
-
   private _onContainerDragStart = (e: SelectionEvent) => {
-    const { viewport } = this._container;
-    const [modelX, modelY] = viewport.toModelCoord(e.x, e.y);
-    const selected = pick(this._blocks, modelX, modelY);
-
-    if (selected) {
-      this._handleClickOnSelected(selected, e);
-    } else {
-      this._blockSelectionState = { type: 'none' };
-      this._frameSelectionState = {
-        start: new DOMPoint(e.raw.x, e.raw.y),
-        end: new DOMPoint(e.raw.x, e.raw.y),
-      };
-
-      this._container.signals.updateSelection.emit(this.blockSelectionState);
-      resetNativeSelection(null);
+    if (this._container.readonly) {
+      return;
     }
-
-    this._startRange = caretRangeFromPoint(e.raw.clientX, e.raw.clientY);
+    return this.currentController.onContainerDragStart(e);
   };
 
   private _onContainerDragMove = (e: SelectionEvent) => {
-    switch (this.blockSelectionState.type) {
-      case 'none':
-        break;
-      case 'single':
-        if (this.blockSelectionState.active) {
-          // TODO reset if drag out of group
-          handleNativeRangeDragMove(this._startRange, e);
-        }
-        // for inactive selection, drag move selected group
-        else if (!this._frameSelectionState) {
-          const block = this.blockSelectionState.selected;
-          const [modelX, modelY, modelW, modelH] = JSON.parse(
-            block.xywh
-          ) as XYWH;
-          const { zoom } = this._container.viewport;
-
-          this._space.updateBlock(block, {
-            xywh: JSON.stringify([
-              modelX + e.delta.x / zoom,
-              modelY + e.delta.y / zoom,
-              modelW,
-              modelH,
-            ]),
-          });
-          this._container.signals.updateSelection.emit(
-            this.blockSelectionState
-          );
-        }
-        break;
+    if (this._container.readonly) {
+      return;
     }
-
-    if (this._frameSelectionState) {
-      this._updateFrameSelectionState(e.raw.x, e.raw.y);
-    }
+    return this.currentController.onContainerDragMove(e);
   };
 
   private _onContainerDragEnd = (e: SelectionEvent) => {
-    this._frameSelectionState = null;
+    if (this._container.readonly) {
+      return;
+    }
+    return this.currentController.onContainerDragEnd(e);
   };
 
   private _onContainerClick = (e: SelectionEvent) => {
-    const { viewport } = this._container;
-    const [modelX, modelY] = viewport.toModelCoord(e.x, e.y);
-    const selected = pick(this._blocks, modelX, modelY);
-
-    if (selected) {
-      this._handleClickOnSelected(selected, e);
-    } else {
-      this._blockSelectionState = { type: 'none' };
-      this._container.signals.updateSelection.emit(this.blockSelectionState);
-      resetNativeSelection(null);
-    }
+    return this.currentController.onContainerClick(e);
   };
 
   syncBlockSelectionRect() {
-    if (this.blockSelectionState.type === 'single') {
-      const rect = getSelectionBoxBound(
-        this._container.viewport,
-        this.blockSelectionState.selected.xywh
-      );
-      this.blockSelectionState.rect = rect;
-    }
-
-    this._updateHoverState(this._hoverState?.block || null);
-    this._container.signals.updateSelection.emit(this.blockSelectionState);
+    return this.currentController.syncBlockSelectionRect();
   }
 
   private _onContainerDblClick = (e: SelectionEvent) => {
-    noop();
+    return this.currentController.onContainerDblClick(e);
   };
 
   private _onContainerMouseMove = (e: SelectionEvent) => {
-    const { viewport } = this._container;
-    const [modelX, modelY] = viewport.toModelCoord(e.x, e.y);
-    const hovered = pick(this._blocks, modelX, modelY);
-
-    this._updateHoverState(hovered);
-    this._container.signals.hoverUpdated.emit();
+    return this._selectionManagers[this.mouseMode.type].onContainerMouseMove(e);
   };
 
   private _onContainerMouseOut = (e: SelectionEvent) => {
-    noop();
+    return this._selectionManagers[this.mouseMode.type].onContainerMouseOut(e);
   };
 
   private _onContainerContextMenu = (e: SelectionEvent) => {
-    repairContextMenuRange(e);
+    return this._selectionManagers[this.mouseMode.type].onContainerContextMenu(
+      e
+    );
   };
 
   dispose() {
     this._mouseDisposeCallback();
     this._wheelDisposeCallback();
+    this._selectionUpdateCallback.dispose();
   }
 }

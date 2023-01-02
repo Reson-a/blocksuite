@@ -1,12 +1,20 @@
 import { css, html, LitElement } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import Quill from 'quill';
+import type { Quill as QuillType } from 'quill';
+import Q from 'quill';
 import {
   ALLOWED_SCHEMES,
   showLinkPopover,
-} from '../../../components/link-popover';
-import { assertExists, getModelByElement, hotkey } from '../../utils';
-import { LinkIcon } from './link-icon';
+} from '../../../components/link-popover/index.js';
+import {
+  assertExists,
+  getDefaultPageBlock,
+  getModelByElement,
+  hotkey,
+} from '../../utils/index.js';
+import { LinkIcon } from './link-icon.js';
+
+const Quill = Q as unknown as typeof QuillType;
 
 // TODO fix Blot types
 type Blot = {
@@ -46,7 +54,7 @@ export class LinkNodeComponent extends LitElement {
   constructor() {
     super();
     this.addEventListener('mouseover', this.onHover);
-    this.addEventListener('mouseout', this.onHoverEnd);
+    this.addEventListener('mouseout', this._onHoverEnd);
   }
 
   // disable shadow DOM to workaround quill
@@ -56,6 +64,12 @@ export class LinkNodeComponent extends LitElement {
   // }
 
   onHover(e: MouseEvent) {
+    const model = getModelByElement(this);
+    const page = getDefaultPageBlock(model);
+    if (page.readonly) {
+      return;
+    }
+
     this.popoverTimer = window.setTimeout(async () => {
       this.onDelayHover(e);
     }, this.popoverHoverOpenDelay);
@@ -66,7 +80,7 @@ export class LinkNodeComponent extends LitElement {
     assertExists(blot);
     const text = blot.domNode.textContent ?? undefined;
 
-    hotkey.withDisableHotkey(async () => {
+    hotkey.withDisabledHotkey(async () => {
       const linkState = await showLinkPopover({
         anchorEl: e.target as HTMLElement,
         text,
@@ -79,12 +93,12 @@ export class LinkNodeComponent extends LitElement {
         const newText = linkState.text;
         const isUpdateText = newText !== text;
         assertExists(blot);
-        this.updateLink(blot, link, isUpdateText ? newText : undefined);
+        this._updateLink(blot, link, isUpdateText ? newText : undefined);
         return;
       }
       if (linkState.type === 'remove') {
         assertExists(blot);
-        this.updateLink(blot, false);
+        this._updateLink(blot, false);
         return;
       }
     });
@@ -93,27 +107,27 @@ export class LinkNodeComponent extends LitElement {
   /**
    * If no pass text, use the original text
    */
-  private async updateLink(blot: Blot, link: string | false, text?: string) {
+  private async _updateLink(blot: Blot, link: string | false, text?: string) {
     const model = getModelByElement(this);
-    const { space } = model;
+    const { page: page } = model;
 
     if (text) {
       // Replace the text
       // Save the blot's index otherwise it will be lost after the blot is removed
       const offset = blot.offset();
-      space.captureSync();
+      page.captureSync();
       // TODO save the format of the original text
       // for make a distinction between user type in and set
       model.text?.delete(offset, blot.length());
       model.text?.insert(text, offset);
       model.text?.format(offset, text.length, { link });
     } else {
-      space.captureSync();
+      page.captureSync();
       model.text?.format(blot.offset(), blot.length(), { link });
     }
   }
 
-  private async onHoverEnd(e: Event) {
+  private async _onHoverEnd(e: Event) {
     clearTimeout(this.popoverTimer);
   }
 

@@ -1,11 +1,16 @@
 /// <reference types="vite/client" />
-import { LitElement, html, css, unsafeCSS } from 'lit';
+import { html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { BLOCK_ID_ATTR, type BlockHost } from '../__internal__';
-import type { ParagraphBlockModel } from './paragraph-model';
+import {
+  BLOCK_ID_ATTR,
+  BlockChildrenContainer,
+  type BlockHost,
+  NonShadowLitElement,
+} from '../__internal__/index.js';
+import '../__internal__/rich-text/rich-text.js';
+import type { ParagraphBlockModel } from './paragraph-model.js';
 
-import { BlockChildrenContainer } from '../__internal__';
-import style from './style.css';
+import style from './style.css?inline';
 
 const getPlaceholder = (model: ParagraphBlockModel) => {
   const { type } = model;
@@ -27,8 +32,8 @@ const getPlaceholder = (model: ParagraphBlockModel) => {
   }
 };
 
-@customElement('paragraph-block')
-export class ParagraphBlockComponent extends LitElement {
+@customElement('affine-paragraph')
+export class ParagraphBlockComponent extends NonShadowLitElement {
   static styles = css`
     ${unsafeCSS(style)}
   `;
@@ -42,11 +47,6 @@ export class ParagraphBlockComponent extends LitElement {
   @property()
   host!: BlockHost;
 
-  // disable shadow DOM to workaround quill
-  createRenderRoot() {
-    return this;
-  }
-
   firstUpdated() {
     this.model.propsUpdated.on(() => this.requestUpdate());
     this.model.childrenUpdated.on(() => this.requestUpdate());
@@ -56,7 +56,11 @@ export class ParagraphBlockComponent extends LitElement {
     this.setAttribute(BLOCK_ID_ATTR, this.model.id);
 
     const { type } = this.model;
-    const childrenContainer = BlockChildrenContainer(this.model, this.host);
+    const childrenContainer = BlockChildrenContainer(
+      this.model,
+      this.host,
+      () => this.requestUpdate()
+    );
     const placeholder = getPlaceholder(this.model);
 
     return html`
@@ -74,6 +78,6 @@ export class ParagraphBlockComponent extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'paragraph-block': ParagraphBlockComponent;
+    'affine-paragraph': ParagraphBlockComponent;
   }
 }

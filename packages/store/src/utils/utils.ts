@@ -1,7 +1,14 @@
 import * as Y from 'yjs';
-import type { BaseBlockModel } from '../base';
-import type { BlockProps, PrefixedBlockProps, YBlock, YBlocks } from '../space';
-import { PrelimText, Text, TextType } from '../text-adapter';
+import type { BaseBlockModel } from '../base.js';
+import type {
+  BlockProps,
+  PrefixedBlockProps,
+  YBlock,
+  YBlocks,
+} from '../workspace/page.js';
+import { PrelimText, Text, TextType } from '../text-adapter.js';
+import type { Workspace } from '../workspace/index.js';
+import { fromBase64, toBase64 } from 'lib0/buffer.js';
 
 const SYS_KEYS = new Set(['id', 'flavour', 'children']);
 
@@ -84,11 +91,32 @@ export function syncBlockProps(
   if (props.flavour === 'affine:list' && !yBlock.has('prop:type')) {
     yBlock.set('prop:type', props.type ?? 'bulleted');
   }
+
   if (props.flavour === 'affine:list' && !yBlock.has('prop:checked')) {
     yBlock.set('prop:checked', props.checked ?? false);
   }
   if (props.flavour === 'affine:group' && !yBlock.has('prop:xywh')) {
     yBlock.set('prop:xywh', props.xywh ?? '[0,0,720,480]');
+  }
+  if (props.flavour === 'affine:embed' && !yBlock.has('prop:width')) {
+    yBlock.set('prop:width', props.width ?? 20);
+  }
+  if (props.flavour === 'affine:embed' && !yBlock.has('prop:sourceId')) {
+    yBlock.set('prop:sourceId', props.sourceId ?? '');
+  }
+  if (props.flavour === 'affine:embed' && !yBlock.has('prop:caption')) {
+    yBlock.set('prop:caption', props.caption ?? '');
+  }
+  if (props.flavour === 'affine:shape') {
+    if (!yBlock.has('prop:xywh')) {
+      yBlock.set('prop:xywh', props.xywh ?? '[0,0,50,50]');
+    }
+    if (!yBlock.has('prop:type')) {
+      yBlock.set('prop:type', props.type ?? 'rectangle');
+    }
+    if (!yBlock.has('prop:color')) {
+      yBlock.set('prop:color', props.color ?? 'black');
+    }
   }
 }
 
@@ -165,4 +193,12 @@ export function toBlockProps(
   });
 
   return props;
+}
+
+export function encodeWorkspaceAsYjsUpdateV2(workspace: Workspace): string {
+  return toBase64(Y.encodeStateAsUpdateV2(workspace.doc));
+}
+
+export function applyYjsUpdateV2(workspace: Workspace, update: string): void {
+  Y.applyUpdateV2(workspace.doc, fromBase64(update));
 }

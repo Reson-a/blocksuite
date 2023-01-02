@@ -6,7 +6,7 @@
     "experimentalDecorators": true,
     "module": "ESNext",
     "lib": ["ESNext", "DOM"],
-    "moduleResolution": "Node",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "sourceMap": true,
     "declaration": true,
@@ -15,11 +15,41 @@
     "importsNotUsedAsValues": "error",
     "isolatedModules": true,
     "esModuleInterop": true,
-    "noEmit": true,
     "noEmitOnError": true,
     "noUnusedLocals": true,
     "noImplicitReturns": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "incremental": true,
+    "paths": {
+      // Why? See https://github.com/DimensionDev/Maskbook/blob/2a042633c5bde18dd97a21d34e4943c8c4efa514/tsconfig.json#L33-L67
+      "@blocksuite/editor": ["./packages/editor/src"],
+      "@blocksuite/blocks": ["./packages/blocks/src"],
+      "@blocksuite/blocks/*": ["./packages/blocks/src/*"],
+      "@blocksuite/react": ["./packages/react/src"],
+      "@blocksuite/react/*": ["./packages/react/src/*"],
+      "@blocksuite/store": ["./packages/store/src"],
+      "@blocksuite/store/*": ["./packages/store/src/*"]
+    }
   },
-  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/blocks"
+    },
+    {
+      "path": "./packages/editor"
+    },
+    {
+      "path": "./packages/playground"
+    },
+    {
+      "path": "./packages/store"
+    },
+    {
+      "path": "./packages/react"
+    },
+    {
+      "path": "./tests"
+    }
+  ]
 }

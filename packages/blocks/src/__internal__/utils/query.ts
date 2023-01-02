@@ -1,13 +1,24 @@
 import type { BaseBlockModel } from '@blocksuite/store';
-import type { DefaultPageBlockComponent } from '../..';
-import type { RichText } from '../rich-text/rich-text';
-import { BLOCK_ID_ATTR as ATTR } from './consts';
-import { assertExists } from './std';
+import type { DefaultPageBlockComponent, SelectedBlock } from '../../index.js';
+import type { RichText } from '../rich-text/rich-text.js';
+import { BLOCK_ID_ATTR as ATTR } from './consts.js';
+import { assertExists, matchFlavours } from './std.js';
+import { ShapeBlockTag } from '../../index.js';
 
 type ElementTagName = keyof HTMLElementTagNameMap;
 
 interface ContainerBlock {
   model?: BaseBlockModel;
+}
+
+export function getShapeBlockHitBox(id: string): SVGPathElement | null {
+  const shapeBlock = getBlockById<'affine-shape'>(id);
+  if (shapeBlock?.tagName !== ShapeBlockTag.toUpperCase()) {
+    throw new Error(`data-block-id: ${id} is not shape block`);
+  }
+  return (
+    shapeBlock.shadowRoot?.querySelector('.affine-shape-block-hit-box') ?? null
+  );
 }
 
 export function getBlockById<T extends ElementTagName>(
@@ -25,7 +36,10 @@ export function getParentBlockById<T extends ElementTagName>(
   return currentBlock?.parentElement?.closest<T>(`[${ATTR}]` as T) || null;
 }
 
-export function getSiblingsById(id: string, ele: Element = document.body) {
+/**
+ * @deprecated use methods in page instead
+ */
+function getSiblingsById(id: string, ele: Element = document.body) {
   // TODO : resolve BaseBlockModel type relay
   const parentBlock = getParentBlockById(id, ele) as ContainerBlock;
   const children = parentBlock?.model?.children;
@@ -36,6 +50,9 @@ export function getSiblingsById(id: string, ele: Element = document.body) {
   return [];
 }
 
+/**
+ * @deprecated use {@link page.getPreviousSibling} instead
+ */
 export function getPreviousSiblingById<T extends ElementTagName>(
   id: string,
   ele: Element = document.body
@@ -49,6 +66,9 @@ export function getPreviousSiblingById<T extends ElementTagName>(
   return null;
 }
 
+/**
+ * @deprecated use {@link page.getNextSibling} instead
+ */
 export function getNextSiblingById<T extends ElementTagName>(
   id: string,
   ele: HTMLElement = document.body
@@ -63,16 +83,16 @@ export function getNextSiblingById<T extends ElementTagName>(
 }
 
 export function getNextBlock(blockId: string) {
-  let currentBlock = getBlockById<'paragraph-block'>(blockId);
+  let currentBlock = getBlockById<'affine-paragraph'>(blockId);
   if (currentBlock?.model.children.length) {
     return currentBlock.model.children[0];
   }
   while (currentBlock) {
-    const parentBlock = getParentBlockById<'paragraph-block'>(
+    const parentBlock = getParentBlockById<'affine-paragraph'>(
       currentBlock.model.id
     );
     if (parentBlock) {
-      const nextSiblings = getNextSiblingById<'paragraph-block'>(
+      const nextSiblings = getNextSiblingById<'affine-paragraph'>(
         currentBlock.model.id
       );
       if (nextSiblings) {
@@ -85,12 +105,16 @@ export function getNextBlock(blockId: string) {
 }
 
 export function getPreviousBlock(container: Element, blockId: string) {
-  const parentBlock = getParentBlockById<'paragraph-block'>(blockId, container);
+  const parentBlock = getParentBlockById<'affine-paragraph'>(
+    blockId,
+    container
+  );
   if (parentBlock) {
-    const previousBlock = getPreviousSiblingById<'paragraph-block'>(
+    const previousBlock = getPreviousSiblingById<'affine-paragraph'>(
       blockId,
       container
     );
+
     if (previousBlock?.model) {
       if (previousBlock.model.children.length) {
         let firstChild =
@@ -108,17 +132,17 @@ export function getPreviousBlock(container: Element, blockId: string) {
 }
 
 export function getDefaultPageBlock(model: BaseBlockModel) {
-  assertExists(model.space.root);
+  assertExists(model.page.root);
   const page = document.querySelector(
-    `[${ATTR}="${model.space.root.id}"]`
+    `[${ATTR}="${model.page.root.id}"]`
   ) as DefaultPageBlockComponent;
   return page;
 }
 
 export function getContainerByModel(model: BaseBlockModel) {
-  assertExists(model.space.root);
+  assertExists(model.page.root);
   const page = document.querySelector(
-    `[${ATTR}="${model.space.root.id}"]`
+    `[${ATTR}="${model.page.root.id}"]`
   ) as DefaultPageBlockComponent;
   const container = page.closest('editor-container');
   assertExists(container);
@@ -126,13 +150,13 @@ export function getContainerByModel(model: BaseBlockModel) {
 }
 
 export function getBlockElementByModel(model: BaseBlockModel) {
-  assertExists(model.space.root);
+  assertExists(model.page.root);
   const page = document.querySelector(
-    `[${ATTR}="${model.space.root.id}"]`
+    `[${ATTR}="${model.page.root.id}"]`
   ) as DefaultPageBlockComponent;
   if (!page) return null;
 
-  if (model.id === model.space.root.id) {
+  if (model.id === model.page.root.id) {
     return page as HTMLElement;
   }
 
@@ -142,6 +166,9 @@ export function getBlockElementByModel(model: BaseBlockModel) {
 
 export function getStartModelBySelection() {
   const selection = window.getSelection() as Selection;
+  if (selection.rangeCount === 0) {
+    throw new Error("Can't get start model by selection, rangeCount is 0");
+  }
 
   const range = selection.getRangeAt(0);
   const startContainer =
@@ -170,8 +197,11 @@ export function getModelsByRange(range: Range): BaseBlockModel[] {
     commonAncestor.attributes &&
     !commonAncestor.attributes.getNamedItem(ATTR)
   ) {
-    commonAncestor = commonAncestor.closest(`[${ATTR}]`)
+    const parentElement = commonAncestor.closest(`[${ATTR}]`)
       ?.parentElement as HTMLElement;
+    if (parentElement != null) {
+      commonAncestor = parentElement;
+    }
   }
   const intersectedModels: BaseBlockModel[] = [];
   const blockElementArray = commonAncestor.querySelectorAll(`[${ATTR}]`);
@@ -179,20 +209,17 @@ export function getModelsByRange(range: Range): BaseBlockModel[] {
     blockElementArray.forEach(ele => {
       const block = ele as ContainerBlock;
       assertExists(block.model);
-      // @ts-ignore
       const blockElement = getBlockElementByModel(block.model);
-      const mainElelment =
-        block.model.flavour === 'affine:page'
-          ? blockElement?.querySelector(
-              '.affine-default-page-block-title-container'
-            )
-          : blockElement?.querySelector('rich-text');
+      const mainElement = matchFlavours(block.model, ['affine:page'])
+        ? blockElement?.querySelector(
+            '.affine-default-page-block-title-container'
+          )
+        : blockElement?.querySelector('rich-text');
       if (
-        mainElelment &&
-        range.intersectsNode(mainElelment) &&
-        blockElement?.tagName !== 'GROUP-BLOCK'
+        mainElement &&
+        range.intersectsNode(mainElement) &&
+        blockElement?.tagName !== 'AFFINE-GROUP'
       ) {
-        // @ts-ignore
         intersectedModels.push(block.model);
       }
     });
@@ -241,8 +268,22 @@ export function getDOMRectByLine(
   }
 }
 
-export function getCurrentRange() {
-  const selection = window.getSelection() as Selection;
+export function getCurrentRange(selection = window.getSelection()) {
+  // When called on an <iframe> that is not displayed (e.g., where display: none is set) Firefox will return null
+  // See https://developer.mozilla.org/en-US/docs/Web/API/Window/getSelection for more details
+  if (!selection) {
+    throw new Error('Failed to get current range, selection is null');
+  }
+  // Before the user has clicked a freshly loaded page, the rangeCount is 0.
+  // The rangeCount will usually be 1.
+  // But scripting can be used to make the selection contain more than one range.
+  // See https://developer.mozilla.org/en-US/docs/Web/API/Selection/rangeCount for more details.
+  if (selection.rangeCount === 0) {
+    throw new Error('Failed to get current range, rangeCount is 0');
+  }
+  if (selection.rangeCount > 1) {
+    console.warn('getCurrentRange may be wrong, rangeCount > 1');
+  }
   return selection.getRangeAt(0);
 }
 
@@ -295,10 +336,61 @@ export function getQuillIndexByNativeSelection(
       selfAdded = true;
       offset += nodeOffset;
     } else {
-      offset += textWithoutNode(ele as Node, lastNode as Node).length;
+      offset += textWithoutNode(ele, lastNode as Node).length;
     }
     lastNode = ele;
     ele = ele?.parentNode;
   }
   return offset;
+}
+
+/**
+ * Get the specific text node and offset by the selected block.
+ * The reverse implementation of {@link getQuillIndexByNativeSelection}
+ * See also {@link getQuillIndexByNativeSelection}
+ *
+ * ```ts
+ * const [startNode, startOffset] = getTextNodeBySelectedBlock(startBlock);
+ * const [endNode, endOffset] = getTextNodeBySelectedBlock(endBlock);
+ *
+ * const range = new Range();
+ * range.setStart(startNode, startOffset);
+ * range.setEnd(endNode, endOffset);
+ *
+ * const selection = window.getSelection();
+ * selection.removeAllRanges();
+ * selection.addRange(range);
+ * ```
+ */
+export function getTextNodeBySelectedBlock(selectedBlock: SelectedBlock) {
+  const blockElement = getBlockById(selectedBlock.id);
+  const offset = selectedBlock.startPos ?? selectedBlock.endPos ?? 0;
+  if (!blockElement) {
+    throw new Error(
+      'Failed to get block element, block id: ' + selectedBlock.id
+    );
+  }
+  const richText = blockElement.querySelector('rich-text');
+  if (!richText) {
+    throw new Error('Failed to get rich text element');
+  }
+  const quill = richText.quill;
+
+  const [leaf, leafOffset]: [
+    {
+      // Blot
+      domNode: HTMLElement;
+    },
+    number
+  ] = quill.getLeaf(offset);
+  return [leaf.domNode, leafOffset] as const;
+}
+
+export function getAllBlocks() {
+  const blocks = Array.from(document.querySelectorAll(`[${ATTR}]`));
+  return blocks.filter(item => {
+    return (
+      item.tagName !== 'AFFINE-DEFAULT-PAGE' && item.tagName !== 'AFFINE-GROUP'
+    );
+  });
 }

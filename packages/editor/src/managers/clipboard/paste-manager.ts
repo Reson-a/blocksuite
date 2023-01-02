@@ -1,8 +1,14 @@
 import type { BaseBlockModel } from '@blocksuite/store';
-import type { EditorContainer } from '../../components';
-import { MarkdownUtils } from './markdown-utils';
-import { CLIPBOARD_MIMETYPE, OpenBlockInfo } from './types';
-import { SelectionUtils, SelectionInfo } from '@blocksuite/blocks';
+import type { EditorContainer } from '../../components/index.js';
+import { MarkdownUtils } from './markdown-utils.js';
+import { CLIPBOARD_MIMETYPE, OpenBlockInfo } from './types.js';
+import {
+  SelectionUtils,
+  SelectionInfo,
+  matchFlavours,
+  assertExists,
+  getStartModelBySelection,
+} from '@blocksuite/blocks';
 
 export class PasteManager {
   private _editor: EditorContainer;
@@ -16,27 +22,50 @@ export class PasteManager {
 
   constructor(editor: EditorContainer) {
     this._editor = editor;
-    this.handlePaste = this.handlePaste.bind(this);
   }
 
-  public async handlePaste(e: ClipboardEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  public handlePaste = async (e: ClipboardEvent) => {
+    const clipboardData = e.clipboardData;
+    if (clipboardData) {
+      const isPlainText = PasteManager._isPlainText(clipboardData);
+      if (isPlainText) {
+        const data = clipboardData.getData('text/plain');
+        if (data === 'text/plain') {
+          return;
+        } else {
+          if (
+            document.activeElement?.classList.contains(
+              'affine-default-page-block-title'
+            )
+          ) {
+            // leave the copy to the default behavior
+            return;
+          }
+        }
+      }
 
-    const blocks = await this._clipboardEvent2Blocks(e);
-    this.insertBlocks(blocks);
-  }
+      const blocksPromise = this._clipboardEvent2Blocks(e);
+      if (blocksPromise instanceof Promise) {
+        e.preventDefault();
+        e.stopPropagation();
+        const blocks: OpenBlockInfo[] = await blocksPromise;
+        this.insertBlocks(blocks);
+      }
+    }
+  };
 
   /* FIXME
-  private get _selection() {
-    const page =
-      document.querySelector<DefaultPageBlockComponent>('default-page-block');
-    if (!page) throw new Error('No page block');
-    return page.selection;
-  }
-  */
+    private get _selection() {
+      const page =
+        document.querySelector<DefaultPageBlockComponent>('default-page-block');
+      if (!page) throw new Error('No page block');
+      return page.selection;
+    }
+    */
 
-  private async _clipboardEvent2Blocks(e: ClipboardEvent) {
+  private _clipboardEvent2Blocks(
+    e: ClipboardEvent
+  ): Promise<OpenBlockInfo[]> | void {
     const clipboardData = e.clipboardData;
     if (!clipboardData) {
       return;
@@ -74,7 +103,11 @@ export class PasteManager {
     }
 
     const textClipData = clipboardData.getData(CLIPBOARD_MIMETYPE.TEXT);
-
+    const shouldNotSplitBlock =
+      getStartModelBySelection().flavour === 'affine:code';
+    if (shouldNotSplitBlock) {
+      return [{ text: [{ insert: textClipData }], children: [] }];
+    }
     const shouldConvertMarkdown =
       MarkdownUtils.checkIfTextContainsMd(textClipData);
     if (
@@ -95,11 +128,30 @@ export class PasteManager {
     clipboardData: DataTransfer
   ): Promise<OpenBlockInfo[]> {
     const file = PasteManager._getImageFile(clipboardData);
+    // assertExists(file)
     if (file) {
-      //  todo upload file to file server
-      return [];
+      if (file.type.includes('image')) {
+        //  todo upload file to file server
+        const storage = await this._editor.page.blobs;
+        assertExists(storage);
+        const id = await storage.set(file);
+        return [
+          {
+            flavour: 'affine:embed',
+            type: 'image',
+            sourceId: id,
+            children: [],
+            text: [{ insert: '' }],
+          },
+        ];
+      }
     }
     return [];
+  }
+
+  private static _isPlainText(clipboardData: DataTransfer) {
+    const types = clipboardData.types;
+    return types[0] === 'text/plain';
   }
 
   private static _isPureFileInClipboard(clipboardData: DataTransfer) {
@@ -125,8 +177,9 @@ export class PasteManager {
     if (blocks.length === 0) {
       return;
     }
+
     const currentSelectionInfo =
-      selectInfo || SelectionUtils.getSelectInfo(this._editor.space);
+      selectInfo || SelectionUtils.getSelectInfo(this._editor.page);
     if (
       currentSelectionInfo.type === 'Range' ||
       currentSelectionInfo.type === 'Caret'
@@ -135,27 +188,27 @@ export class PasteManager {
         currentSelectionInfo.selectedBlocks[
           currentSelectionInfo.selectedBlocks.length - 1
         ];
-      const selectedBlock = this._editor.space.getBlockById(lastBlock.id);
+      const selectedBlock = this._editor.page.getBlockById(lastBlock.id);
       let parent = selectedBlock;
       let index = 0;
       if (selectedBlock) {
-        if (selectedBlock.flavour === 'affine:page') {
-          if (selectedBlock.children[0]?.flavour === 'affine:group') {
+        if (matchFlavours(selectedBlock, ['affine:page'])) {
+          if (matchFlavours(selectedBlock.children[0], ['affine:group'])) {
             parent = selectedBlock.children[0];
           } else {
-            const id = this._editor.space.addBlock(
+            const id = this._editor.page.addBlock(
               { flavour: 'affine:group' },
               selectedBlock.id
             );
-            parent = this._editor.space.getBlockById(id);
+            parent = this._editor.page.getBlockById(id);
           }
-        } else if (selectedBlock.flavour !== 'affine:group') {
-          parent = this._editor.space.getParent(selectedBlock);
+        } else if (!matchFlavours(selectedBlock, ['affine:group'])) {
+          parent = this._editor.page.getParent(selectedBlock);
           index = (parent?.children.indexOf(selectedBlock) || 0) + 1;
         }
       }
       const addBlockIds: string[] = [];
-      if (selectedBlock?.flavour !== 'affine:page') {
+      if (selectedBlock && !matchFlavours(selectedBlock, ['affine:page'])) {
         const endIndex = lastBlock.endPos || selectedBlock?.text?.length || 0;
         const insertTexts = blocks[0].text;
         const insertLen = insertTexts.reduce(
@@ -167,7 +220,28 @@ export class PasteManager {
         selectedBlock?.text?.insertList(insertTexts, endIndex);
         selectedBlock &&
           this._addBlocks(blocks[0].children, selectedBlock, 0, addBlockIds);
-        parent && this._addBlocks(blocks.slice(1), parent, index, addBlockIds);
+        //This is a temporary processing of the divider block, subsequent refactoring of the divider will remove it
+        if (
+          blocks[0].flavour === 'affine:divider' ||
+          blocks[0].flavour === 'affine:embed'
+        ) {
+          parent &&
+            this._addBlocks(blocks.slice(0), parent, index, addBlockIds);
+          const lastBlockModel = this._editor.page.getBlockById(lastBlock.id);
+          // On pasting image,  replace the last empty focused paragraph instead of appending a new image block,
+          // if this paragraph is empty.
+          if (
+            lastBlockModel &&
+            matchFlavours(lastBlockModel, ['affine:paragraph']) &&
+            lastBlockModel?.text?.length === 0 &&
+            lastBlockModel?.children.length === 0
+          ) {
+            this._editor.page.deleteBlock(lastBlockModel);
+          }
+        } else {
+          parent &&
+            this._addBlocks(blocks.slice(1), parent, index, addBlockIds);
+        }
         let lastId = selectedBlock?.id;
         let position = endIndex + insertLen;
         if (addBlockIds.length > 0) {
@@ -175,17 +249,22 @@ export class PasteManager {
             endIndex + insertLen
           );
           lastId = addBlockIds[addBlockIds.length - 1];
-          const lastBlock = this._editor.space.getBlockById(lastId);
-          selectedBlock?.text?.delete(
-            endIndex + insertLen,
-            selectedBlock?.text?.length
-          );
-          position = lastBlock?.text?.length || 0;
-          lastBlock?.text?.insertList(endtexts, lastBlock?.text?.length);
+          const lastBlock = this._editor.page.getBlockById(lastId);
+          if (
+            lastBlock?.flavour !== 'affine:embed' &&
+            lastBlock?.flavour !== 'affine:divider'
+          ) {
+            selectedBlock?.text?.delete(
+              endIndex + insertLen,
+              selectedBlock?.text?.length
+            );
+            position = lastBlock?.text?.length || 0;
+            lastBlock?.text?.insertList(endtexts, lastBlock?.text?.length);
+          }
         }
         setTimeout(() => {
           lastId &&
-            this._editor.space.richTextAdapters
+            this._editor.page.richTextAdapters
               .get(lastId)
               ?.quill.setSelection(position, 0);
         });
@@ -193,7 +272,7 @@ export class PasteManager {
         parent && this._addBlocks(blocks, parent, index, addBlockIds);
       }
     } else if (currentSelectionInfo.type === 'Block') {
-      const selectedBlock = this._editor.space.getBlockById(
+      const selectedBlock = this._editor.page.getBlockById(
         currentSelectionInfo.selectedBlocks[
           currentSelectionInfo.selectedBlocks.length - 1
         ].id
@@ -202,18 +281,18 @@ export class PasteManager {
       let parent = selectedBlock;
       let index = 0;
       if (selectedBlock) {
-        if (selectedBlock.flavour === 'affine:page') {
-          if (selectedBlock.children[0]?.flavour === 'affine:group') {
+        if (matchFlavours(selectedBlock, ['affine:page'])) {
+          if (matchFlavours(selectedBlock.children[0], ['affine:group'])) {
             parent = selectedBlock.children[0];
           } else {
-            const id = this._editor.space.addBlock(
+            const id = this._editor.page.addBlock(
               { flavour: 'affine:group' },
               selectedBlock.id
             );
-            parent = this._editor.space.getBlockById(id);
+            parent = this._editor.page.getBlockById(id);
           }
-        } else if (selectedBlock.flavour !== 'affine:group') {
-          parent = this._editor.space.getParent(selectedBlock);
+        } else if (!matchFlavours(selectedBlock, ['affine:group'])) {
+          parent = this._editor.page.getParent(selectedBlock);
           index = (parent?.children.indexOf(selectedBlock) || 0) + 1;
         }
       }
@@ -236,10 +315,16 @@ export class PasteManager {
         flavour: block.flavour as string,
         type: block.type as string,
         checked: block.checked,
+        sourceId: block.sourceId,
+        caption: block.caption,
+        width: block.width,
+        height: block.height,
       };
-      const id = this._editor.space.addBlock(blockProps, parent, index + i);
-      const model = this._editor.space.getBlockById(id);
-      block.text && model?.text?.applyDelta(block.text);
+      const id = this._editor.page.addBlock(blockProps, parent, index + i);
+      const model = this._editor.page.getBlockById(id);
+      if (model && !matchFlavours(model, ['affine:embed', 'affine:divider'])) {
+        block.text && model?.text?.applyDelta(block.text);
+      }
       addBlockIds.push(id);
       model && this._addBlocks(block.children, model, 0, addBlockIds);
     }

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as Y from 'yjs';
-import type { AwarenessAdapter } from './awareness';
+import type { AwarenessAdapter } from './awareness.js';
 import type { DeltaOperation, Quill } from 'quill';
-import type { Space } from './space';
+import type { Space } from './space.js';
 
 type PrelimTextType = 'splitLeft' | 'splitRight';
 
@@ -222,7 +222,7 @@ export class Text {
 
   applyDelta(delta: any) {
     this._transact(() => {
-      this._yText.applyDelta(delta);
+      this._yText?.applyDelta(delta);
     });
   }
 
@@ -345,9 +345,9 @@ export class RichTextAdapter {
   };
 
   private _quillObserver = (
-    _eventType: string,
+    eventType: string,
     delta: any,
-    _state: any,
+    state: any,
     origin: any
   ) => {
     const { yText } = this;

@@ -1,44 +1,91 @@
-import hotkeys, { KeyHandler } from 'hotkeys-js';
+import Hotkeys from 'hotkeys-js';
+import type { Hotkeys as HotkeysType, KeyHandler } from 'hotkeys-js';
+const hotkeys = Hotkeys as unknown as HotkeysType;
 
 hotkeys.filter = () => true;
 
+const SCOPE = {
+  AFFINE_PAGE: 'affine:page',
+  OTHER: 'other',
+};
+
 // Singleton
 class HotkeyManager {
-  private _hotkeys: typeof hotkeys;
+  private readonly _hotkeys: typeof hotkeys;
+
   constructor() {
     this._hotkeys = hotkeys;
   }
-  private _setScope(scope: string) {
+
+  private _setScope(scope: string): void {
     this._hotkeys.setScope(scope);
   }
-  addListener(hotkey: string, listener: KeyHandler, scope?: string) {
-    this._hotkeys(hotkey, { scope: scope ?? 'affine:page' }, listener);
+
+  addListener(
+    hotkey: string,
+    listener: KeyHandler,
+    scope: string = SCOPE.AFFINE_PAGE
+  ): void {
+    this._hotkeys(hotkey, { scope }, listener);
   }
 
-  removeListener(hotkey: string | Array<string>, scope?: string) {
+  removeListener(
+    hotkey: string | Array<string>,
+    scope: string = SCOPE.AFFINE_PAGE
+  ): void {
     this._hotkeys.unbind(
       (Array.isArray(hotkey) ? hotkey : [hotkey]).join(','),
-      scope ?? 'affine:page'
+      scope
     );
   }
-  disableHotkey() {
-    this._hotkeys.setScope('other');
+
+  disableHotkey(): void {
+    this._hotkeys.setScope(SCOPE.OTHER);
   }
-  enableHotkey() {
-    this._setScope('affine:page');
+
+  enableHotkey(): void {
+    this._setScope(SCOPE.AFFINE_PAGE);
   }
 
   /**
-   * Create a context to shielding against global hotkey
+   * Create a context to shielding against global hotkey.
+   *
+   * The param `fn` will be executed immediately.
+   * @example
+   * ```ts
+   * const ret = await hotkey.withDisableHotkey(async () => {
+   *   const result = await createLink(space);
+   *   return result;
+   * });
+   * ```
    */
-  async withDisableHotkey(fn: () => void | Promise<unknown>) {
+  async withDisabledHotkey<T = void>(fn: () => Promise<T>) {
     this.disableHotkey();
     try {
-      const ret = await fn();
-      return ret;
+      return await fn();
     } finally {
       this.enableHotkey();
     }
+  }
+
+  /**
+   * Similar to {@link withDisableHotkey}, but return a function instead of execute immediately.
+   * @example
+   * ```ts
+   * const createLinkWithoutHotkey = withDisabledHotkeyFn((space) => createLink(space));
+   * await createLinkWithoutHotkey(space);
+   * ```
+   */
+  withDisabledHotkeyFn<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    T extends (...args: any[]) => Promise<any> = (
+      ...args: unknown[]
+    ) => Promise<unknown>
+  >(fn: T) {
+    return ((...args: Parameters<T>) =>
+      this.withDisabledHotkey<ReturnType<T>>(() =>
+        fn(...args)
+      ) as ReturnType<T>) as unknown as T;
   }
 }
 

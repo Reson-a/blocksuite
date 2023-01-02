@@ -1,50 +1,56 @@
 /// <reference types="vite/client" />
-import { LitElement, html, unsafeCSS, css } from 'lit';
+import { html, unsafeCSS, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { Disposable, Signal, Space } from '@blocksuite/store';
-import type { GroupBlockModel, PageBlockModel } from '../..';
+import { Disposable, Signal, Page } from '@blocksuite/store';
+import type {
+  GroupBlockModel,
+  MouseMode,
+  PageBlockModel,
+} from '../../index.js';
 import {
   EdgelessBlockChildrenContainer,
   EdgelessHoverRect,
-  EdgelessSelectedRect,
   EdgelessFrameSelectionRect,
-} from './components';
+} from './components.js';
 import {
   BlockHost,
   BLOCK_ID_ATTR,
   hotkey,
   HOTKEYS,
   resetNativeSelection,
-} from '../../__internal__';
+} from '../../__internal__/index.js';
 import {
   EdgelessSelectionManager,
   BlockSelectionState,
   ViewportState,
   XYWH,
-} from './selection-manager';
+} from './selection-manager.js';
 import {
   bindCommonHotkey,
   handleBackspace,
   removeCommonHotKey,
   tryUpdateGroupSize,
-  updateTextType,
-} from '../utils';
-import style from './style.css';
+  updateSelectedTextType,
+} from '../utils/index.js';
+import style from './style.css?inline';
+import { NonShadowLitElement } from '../../__internal__/utils/lit.js';
+import { getService } from '../../__internal__/service.js';
 
 export interface EdgelessContainer extends HTMLElement {
-  readonly space: Space;
+  readonly page: Page;
   readonly viewport: ViewportState;
   readonly mouseRoot: HTMLElement;
   readonly signals: {
     hoverUpdated: Signal;
     viewportUpdated: Signal;
     updateSelection: Signal<BlockSelectionState>;
+    shapeUpdated: Signal;
   };
 }
 
-@customElement('edgeless-page-block')
+@customElement('affine-edgeless-page')
 export class EdgelessPageBlockComponent
-  extends LitElement
+  extends NonShadowLitElement
   implements EdgelessContainer, BlockHost
 {
   static styles = css`
@@ -52,12 +58,18 @@ export class EdgelessPageBlockComponent
   `;
 
   @property()
-  space!: Space;
+  page!: Page;
+
+  @property()
+  readonly = false;
 
   flavour = 'edgeless' as const;
 
   @property()
   mouseRoot!: HTMLElement;
+
+  @property()
+  mouseMode!: MouseMode;
 
   @property({
     hasChanged() {
@@ -65,6 +77,7 @@ export class EdgelessPageBlockComponent
     },
   })
   model!: PageBlockModel;
+  getService = getService;
 
   @state()
   viewport = new ViewportState();
@@ -73,15 +86,16 @@ export class EdgelessPageBlockComponent
     viewportUpdated: new Signal(),
     updateSelection: new Signal<BlockSelectionState>(),
     hoverUpdated: new Signal(),
+    shapeUpdated: new Signal(),
   };
 
   private _historyDisposable!: Disposable;
   private _selection!: EdgelessSelectionManager;
 
   private _bindHotkeys() {
-    const { space } = this;
+    const { page: space } = this;
 
-    hotkey.addListener(HOTKEYS.BACKSPACE, this._handleBackspace.bind(this));
+    hotkey.addListener(HOTKEYS.BACKSPACE, this._handleBackspace);
     hotkey.addListener(HOTKEYS.H1, () =>
       this._updateType('affine:paragraph', 'h1', space)
     );
@@ -113,20 +127,46 @@ export class EdgelessPageBlockComponent
     bindCommonHotkey(space);
   }
 
-  private _updateType(flavour: string, type: string, space: Space): void {
-    updateTextType(flavour, type, space);
+  private _updateType(flavour: string, type: string, space: Page): void {
+    updateSelectedTextType(flavour, type, space);
   }
 
   private _removeHotkeys() {
-    hotkey.removeListener([HOTKEYS.BACKSPACE], this.flavour);
+    hotkey.removeListener(
+      [
+        HOTKEYS.BACKSPACE,
+        HOTKEYS.H1,
+        HOTKEYS.H2,
+        HOTKEYS.H3,
+        HOTKEYS.H4,
+        HOTKEYS.H5,
+        HOTKEYS.H6,
+        HOTKEYS.SHIFT_DOWN,
+        HOTKEYS.NUMBERED_LIST,
+        HOTKEYS.BULLETED,
+        HOTKEYS.TEXT,
+      ],
+      this.flavour
+    );
     removeCommonHotKey();
   }
 
-  private _handleBackspace(e: KeyboardEvent) {
+  private _handleBackspace = (e: KeyboardEvent) => {
     if (this._selection.blockSelectionState.type === 'single') {
-      handleBackspace(this.space, e);
+      const selectedBlock = this._selection.blockSelectionState.selected;
+      if (selectedBlock.flavour === 'affine:shape') {
+        this.page.captureSync();
+        this.page.deleteBlock(selectedBlock);
+        // TODO: cleanup state instead of create a instance
+        this._selection = new EdgelessSelectionManager(this);
+        this.signals.updateSelection.emit({
+          type: 'none',
+        });
+      } else {
+        handleBackspace(this.page, e);
+      }
     }
-  }
+  };
 
   private _initViewport() {
     const bound = this.mouseRoot.getBoundingClientRect();
@@ -145,14 +185,12 @@ export class EdgelessPageBlockComponent
     });
   }
 
-  // disable shadow DOM to workaround quill
-  createRenderRoot() {
-    return this;
-  }
-
   update(changedProperties: Map<string, unknown>) {
-    if (changedProperties.has('mouseRoot') && changedProperties.has('space')) {
+    if (changedProperties.has('mouseRoot') && changedProperties.has('page')) {
       this._selection = new EdgelessSelectionManager(this);
+    }
+    if (changedProperties.has('mouseMode')) {
+      this._selection.mouseMode = this.mouseMode;
     }
     super.update(changedProperties);
   }
@@ -163,20 +201,25 @@ export class EdgelessPageBlockComponent
       group.propsUpdated.on(() => this._selection.syncBlockSelectionRect());
     });
 
-    this.signals.viewportUpdated.on(() =>
-      this._selection.syncBlockSelectionRect()
-    );
+    this.signals.viewportUpdated.on(() => {
+      this.style.setProperty('--affine-zoom', `${this.viewport.zoom}`);
+      this._selection.syncBlockSelectionRect();
+      this.requestUpdate();
+    });
     this.signals.hoverUpdated.on(() => this.requestUpdate());
     this.signals.updateSelection.on(() => this.requestUpdate());
-    this._historyDisposable = this.space.signals.historyUpdated.on(() => {
+    this.signals.shapeUpdated.on(() => this.requestUpdate());
+    this._historyDisposable = this.page.signals.historyUpdated.on(() => {
       this._clearSelection();
+      this.requestUpdate();
     });
 
     this._bindHotkeys();
 
+    tryUpdateGroupSize(this.page, this.viewport.zoom);
     this.addEventListener('keydown', e => {
       if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-      tryUpdateGroupSize(this.space, this.viewport.zoom);
+      tryUpdateGroupSize(this.page, this.viewport.zoom);
     });
 
     requestAnimationFrame(() => {
@@ -194,6 +237,7 @@ export class EdgelessPageBlockComponent
     this.signals.updateSelection.dispose();
     this.signals.viewportUpdated.dispose();
     this.signals.hoverUpdated.dispose();
+    this.signals.shapeUpdated.dispose();
     this._historyDisposable.dispose();
     this._selection.dispose();
     this._removeHotkeys();
@@ -210,15 +254,23 @@ export class EdgelessPageBlockComponent
 
     const { _selection } = this;
     const { frameSelectionRect } = _selection;
+    const selectionState = this._selection.blockSelectionState;
     const { zoom } = this.viewport;
-    const selectedRect = EdgelessSelectedRect(_selection, zoom);
     const selectionRect = EdgelessFrameSelectionRect(frameSelectionRect);
-    const hoverRect = EdgelessHoverRect(_selection.hoverRect, zoom);
+    const hoverRect = EdgelessHoverRect(_selection.hoverState, zoom);
 
     return html`
       <style></style>
       <div class="affine-edgeless-page-block-container">
-        ${childrenContainer} ${hoverRect} ${selectionRect} ${selectedRect}
+        ${childrenContainer} ${hoverRect} ${selectionRect}
+        ${selectionState.type !== 'none'
+          ? html`<edgeless-selected-rect
+              .state=${selectionState}
+              .rect=${selectionState.rect}
+              .zoom=${zoom}
+              .readonly=${this.readonly}
+            ></edgeless-selected-rect>`
+          : null}
       </div>
     `;
   }
@@ -226,6 +278,6 @@ export class EdgelessPageBlockComponent
 
 declare global {
   interface HTMLElementTagNameMap {
-    'edgeless-page-block': EdgelessPageBlockComponent;
+    'affine-edgeless-page': EdgelessPageBlockComponent;
   }
 }

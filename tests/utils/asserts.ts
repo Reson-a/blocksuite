@@ -1,21 +1,41 @@
+/* eslint-disable @typescript-eslint/no-restricted-imports */
 /* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import './declare-test-window';
-import { expect, type Page } from '@playwright/test';
+import './declare-test-window.js';
+import { expect, Locator, type Page } from '@playwright/test';
 import type {
   BaseBlockModel,
-  PrefixedBlockProps,
   SerializedStore,
-} from '../../packages/store';
-import type { JSXElement } from '../../packages/store/src/utils/jsx';
+} from '../../packages/store/src/index.js';
+import type { PrefixedBlockProps } from '../../packages/store/src/workspace/page.js';
+
+import type { JSXElement } from '../../packages/store/src/utils/jsx.js';
 import {
   format as prettyFormat,
   plugins as prettyFormatPlugins,
 } from 'pretty-format';
 
 export const defaultStore: SerializedStore = {
-  page0: {
+  'space:meta': {
+    pages: [
+      {
+        id: 'page0',
+        title: '',
+      },
+    ],
+    versions: {
+      'affine:paragraph': 1,
+      'affine:page': 1,
+      'affine:list': 1,
+      'affine:group': 1,
+      'affine:divider': 1,
+      'affine:embed': 1,
+      'affine:shape': 1,
+      'affine:code': 1,
+    },
+  },
+  'space:page0': {
     '0': {
       'sys:id': '0',
       'sys:flavour': 'affine:page',
@@ -38,12 +58,11 @@ export const defaultStore: SerializedStore = {
 };
 
 export async function assertEmpty(page: Page) {
-  const actual = await page.locator('paragraph-block').count();
-  expect(actual).toBe(0);
+  await assertRichTexts(page, ['\n']);
 }
 
 export async function assertTitle(page: Page, text: string) {
-  const locator = page.locator('input').nth(0);
+  const locator = page.locator('.affine-default-page-block-title').nth(0);
   const actual = await locator.inputValue();
   expect(actual).toBe(text);
 }
@@ -59,12 +78,44 @@ export async function assertTextContain(page: Page, text: string) {
 }
 
 export async function assertRichTexts(page: Page, texts: string[]) {
+  await page.mouse.move(100, 100); // move mouse for focus
   const actual = await page.locator('.ql-editor').allInnerTexts();
   expect(actual).toEqual(texts);
 }
 
+export async function assertRichImage(page: Page, count: number) {
+  const actual = await page.locator('.resizable-img').count();
+  expect(actual).toEqual(count);
+}
+
+export async function assertDivider(page: Page, count: number) {
+  const actual = await page.locator('affine-divider').count();
+  expect(actual).toEqual(count);
+}
+
+export async function assertRichDragButton(page: Page) {
+  const actual = await page.locator('.resize').count();
+  expect(actual).toEqual(4);
+}
+
+export async function assertImageSize(
+  page: Page,
+  { width, height }: { width: number; height: number }
+) {
+  const actual = await page.locator('.resizable-img').boundingBox();
+  expect(actual?.width).toEqual(width);
+  expect(actual?.height).toEqual(height);
+}
+
+export async function assertImageOption(page: Page) {
+  // const actual = await page.locator('.embed-editing-state').count();
+  // expect(actual).toEqual(1);
+  const locator = page.locator('.embed-editing-state');
+  await expect(locator).toBeVisible();
+}
+
 export async function assertPageTitleFocus(page: Page) {
-  const locator = await page.locator('input').nth(0);
+  const locator = page.locator('.affine-default-page-block-title').nth(0);
   await expect(locator).toBeFocused();
 }
 
@@ -73,7 +124,7 @@ export async function assertBlockCount(
   flavour: string,
   count: number
 ) {
-  const actual = await page.locator(`${flavour}-block`).count();
+  const actual = await page.locator(`affine-${flavour}`).count();
   expect(actual).toBe(count);
 }
 
@@ -139,9 +190,11 @@ export async function assertTextFormats(page: Page, resultObj: unknown[]) {
 }
 
 export async function assertStore(page: Page, expected: SerializedStore) {
-  const actual = (await page.evaluate(() =>
-    window.store.doc.toJSON()
-  )) as SerializedStore;
+  const actual = (await page.evaluate(() => {
+    const json = window.workspace.doc.toJSON();
+    delete json['space:meta'].pages[0].createDate;
+    return json;
+  })) as SerializedStore;
   expect(actual).toEqual(expected);
 }
 
@@ -242,9 +295,9 @@ export async function assertBlockTypes(page: Page, blockTypes: string[]) {
  */
 export async function assertMatchMarkdown(page: Page, text: string) {
   const jsonDoc = (await page.evaluate(() =>
-    window.store.doc.toJSON()
+    window.workspace.doc.toJSON()
   )) as SerializedStore;
-  const titleNode = jsonDoc.page0['0'];
+  const titleNode = jsonDoc['space:page0']['0'] as PrefixedBlockProps;
 
   const markdownVisitor = (node: PrefixedBlockProps): string => {
     // TODO use schema
@@ -274,11 +327,11 @@ export async function assertMatchMarkdown(page: Page, text: string) {
       // return visitor(node);
     }
 
-    const children = node['sys:children'].map(id => jsonDoc.page0[id]);
+    const children = node['sys:children'].map(id => jsonDoc['space:page0'][id]);
     return [
       visitor(node),
       ...children.flatMap(child =>
-        visitNodes(child, visitor).map(line => {
+        visitNodes(child as PrefixedBlockProps, visitor).map(line => {
           if (node['sys:flavour'] === 'affine:page') {
             // Ad hoc way to remove the title indent
             return line;
@@ -301,7 +354,7 @@ export async function assertStoreMatchJSX(
   id?: string
 ) {
   const element = (await page.evaluate(
-    id => window.store.toJSXElement(id),
+    id => window.workspace.exportJSX(id),
     id
   )) as JSXElement;
 
@@ -337,13 +390,71 @@ export async function assertStoreMatchJSX(
   expect(snapshot.trimStart(), formattedJSX).toEqual(formattedJSX);
 }
 
-export async function assertClipItems(page: Page, key: string, value: unknown) {
+type MimeType = 'text/plain' | 'blocksuite/x-c+w' | 'text/html';
+
+export async function assertClipItems(
+  page: Page,
+  key: MimeType,
+  value: unknown
+) {
   const clipItems = await page.evaluate(() => {
     return document
       .getElementsByTagName('editor-container')[0]
       .clipboard['_copy']['_getClipItems']();
   });
-  // @ts-ignore
   const actual = clipItems.find(item => item.mimeType === key)?.data;
   expect(actual).toEqual(value);
+}
+
+export function assertAlmostEqual(
+  actual: number,
+  expected: number,
+  precision = 0.001
+) {
+  expect(Math.abs(actual - expected)).toBeLessThan(precision);
+}
+
+/**
+ * Assert the locator is visible in the viewport.
+ * It will check the bounding box of the locator is within the viewport.
+ *
+ * See also https://playwright.dev/docs/actionability#visible
+ */
+export async function assertLocatorVisible(
+  page: Page,
+  locator: Locator,
+  visible = true
+) {
+  const bodyRect = await page.locator('body').boundingBox();
+  const rect = await locator.boundingBox();
+  expect(rect).toBeTruthy();
+  expect(bodyRect).toBeTruthy();
+  if (!rect || !bodyRect) {
+    throw new Error('Unreachable');
+  }
+  if (visible) {
+    // Assert the locator is **fully** visible
+    await expect(locator).toBeVisible();
+    expect(rect.x).toBeGreaterThanOrEqual(0);
+    expect(rect.y).toBeGreaterThanOrEqual(0);
+    expect(rect.x + rect.width).toBeLessThanOrEqual(
+      bodyRect.x + bodyRect.width
+    );
+    expect(rect.y + rect.height).toBeLessThanOrEqual(
+      bodyRect.x + bodyRect.height
+    );
+  } else {
+    // Assert the locator is **fully** invisible
+    const locatorIsVisible = await locator.isVisible();
+    if (!locatorIsVisible) {
+      // If the locator is invisible, we don't need to check the bounding box
+      return;
+    }
+    const isInVisible =
+      rect.x > bodyRect.x + bodyRect.width ||
+      rect.y > bodyRect.y + bodyRect.height ||
+      rect.x + rect.width < bodyRect.x ||
+      rect.y + rect.height < bodyRect.y;
+    expect(isInVisible).toBe(true);
+  }
 }

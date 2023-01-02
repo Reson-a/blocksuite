@@ -1,9 +1,5 @@
-import type { Space } from '@blocksuite/store';
-import type { EditorContainer } from './components';
-
-export * from './components';
-export * from './managers';
-export * from './block-loader';
+export * from './components/index.js';
+export * from './managers/index.js';
 const env =
   typeof globalThis !== 'undefined'
     ? globalThis
@@ -23,9 +19,3 @@ if (env[importIdentifier] === true) {
 }
 // @ts-ignore
 env[importIdentifier] = true;
-
-export const createEditor = (space: Space): EditorContainer => {
-  const editor = document.createElement('editor-container');
-  editor.space = space;
-  return editor;
-};

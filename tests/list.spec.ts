@@ -8,10 +8,8 @@ import {
   assertSelection,
   assertStoreMatchJSX,
   assertTextContent,
-} from './utils/asserts';
+} from './utils/asserts.js';
 import {
-  convertToBulletedListByClick,
-  convertToNumberedListByClick,
   enterPlaygroundRoom,
   enterPlaygroundWithList,
   focusRichText,
@@ -21,15 +19,16 @@ import {
   undoByClick,
   undoByKeyboard,
   pressTab,
-  initEmptyState,
-} from './utils/actions';
+  initEmptyParagraphState,
+  clickBlockTypeMenuItem,
+} from './utils/actions/index.js';
 
 test('add new bulleted list', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
 
   await focusRichText(page, 0);
-  await convertToBulletedListByClick(page);
+  await clickBlockTypeMenuItem(page, 'Bulleted List');
   await page.keyboard.type('aa');
   await pressEnter(page);
   await page.keyboard.type('aa');
@@ -41,11 +40,11 @@ test('add new bulleted list', async ({ page }) => {
 
 test('convert to numbered list block', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
 
   await focusRichText(page, 0); // created 0, 1, 2
-  await convertToBulletedListByClick(page); // replaced 2 to 3
-  await convertToNumberedListByClick(page);
+  await clickBlockTypeMenuItem(page, 'Bulleted List'); // replaced 2 to 3
+  await clickBlockTypeMenuItem(page, 'Numbered List');
   await focusRichText(page, 0);
 
   const listSelector = '.affine-list-rich-text-wrapper';
@@ -217,7 +216,7 @@ test('nested list blocks', async ({ page }) => {
 
 test('basic indent and unindent', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
 
   await page.keyboard.type('text1');
@@ -264,6 +263,7 @@ test('basic indent and unindent', async ({ page }) => {
 </affine:page>`
   );
 
+  await page.waitForTimeout(100);
   await pressShiftTab(page);
   await assertStoreMatchJSX(
     page,
@@ -282,6 +282,57 @@ test('basic indent and unindent', async ({ page }) => {
     />
   </affine:group>
 </affine:page>`
+  );
+});
+
+// TODO fix indent will lose todo status
+test.skip('should indent todo block preserve todo status', async ({ page }) => {
+  await enterPlaygroundRoom(page);
+  const { groupId } = await initEmptyParagraphState(page);
+  await focusRichText(page);
+  await page.keyboard.type('text1');
+  await pressEnter(page);
+  await page.keyboard.type('[x] ');
+  await page.waitForTimeout(10);
+  await page.keyboard.type('todo item');
+  await pressTab(page);
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:group
+  prop:xywh="[0,0,720,72]"
+>
+  <affine:paragraph
+    prop:text="text1"
+    prop:type="text"
+  >
+    <affine:list
+      prop:checked={true}
+      prop:text="todo item"
+      prop:type="todo"
+    />
+  </affine:paragraph>
+</affine:group>`,
+    groupId
+  );
+  await pressShiftTab(page);
+  await assertStoreMatchJSX(
+    page,
+    `
+<affine:group
+  prop:xywh="[0,0,720,72]"
+>
+  <affine:paragraph
+    prop:text="text1"
+    prop:type="text"
+  />
+  <affine:list
+    prop:checked={true}
+    prop:text="todo item"
+    prop:type="todo"
+  />
+</affine:group>`,
+    groupId
   );
 });
 

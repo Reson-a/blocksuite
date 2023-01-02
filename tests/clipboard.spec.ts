@@ -1,4 +1,4 @@
-import './utils/declare-test-window';
+import './utils/declare-test-window.js';
 import { test } from '@playwright/test';
 import {
   enterPlaygroundRoom,
@@ -10,11 +10,11 @@ import {
   dragBetweenCoords,
   setSelection,
   pressEnter,
-  initEmptyState,
+  initEmptyParagraphState,
   resetHistory,
   copyByKeyboard,
   pasteByKeyboard,
-} from './utils/actions';
+} from './utils/actions/index.js';
 import {
   assertBlockTypes,
   assertClipItems,
@@ -22,12 +22,12 @@ import {
   assertSelection,
   assertText,
   assertTextFormats,
-} from './utils/asserts';
+} from './utils/asserts.js';
 
 // TODO fix CI
 test.skip('clipboard copy paste', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
 
   await page.keyboard.type('test');
@@ -40,7 +40,7 @@ test.skip('clipboard copy paste', async ({ page }) => {
 
 test('markdown format parse', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await resetHistory(page);
 
@@ -138,9 +138,9 @@ test('markdown format parse', async ({ page }) => {
   await assertRichTexts(page, ['\n']);
 });
 
-test('splic block when paste', async ({ page }) => {
+test('split block when paste', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await resetHistory(page);
 
@@ -177,7 +177,7 @@ test('splic block when paste', async ({ page }) => {
 
 test('import markdown', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await resetHistory(page);
 
@@ -193,10 +193,10 @@ test('import markdown', async ({ page }) => {
 
 test('copy clipItems format', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.evaluate(() => {
-    window.space.captureSync();
+    window.page.captureSync();
   });
 
   const clipData = `
@@ -216,4 +216,21 @@ test('copy clipItems format', async ({ page }) => {
   );
   await undoByClick(page);
   await assertRichTexts(page, ['\n']);
+});
+
+test('copy & paste outside editor', async ({ page }) => {
+  await enterPlaygroundRoom(page);
+  await initEmptyParagraphState(page);
+  await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.setAttribute('id', 'input-test');
+    input.value = '123';
+    document.querySelector('.debug-menu')?.appendChild(input);
+  });
+  await page.focus('#input-test');
+  await page.dblclick('#input-test');
+  await copyByKeyboard(page);
+  await focusRichText(page);
+  await pasteByKeyboard(page);
+  await assertRichTexts(page, ['123']);
 });

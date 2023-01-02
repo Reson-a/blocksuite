@@ -1,13 +1,13 @@
-import type { Space } from '@blocksuite/store';
+import type { Page } from '@blocksuite/store';
 import type { Quill } from 'quill';
-import type { ExtendedModel } from './types';
+import { matchFlavours, sleep } from './std.js';
+import type { ExtendedModel } from './types.js';
 
 // XXX: workaround quill lifecycle issue
-export function asyncFocusRichText(space: Space, id: string) {
-  setTimeout(() => {
-    const adapter = space.richTextAdapters.get(id);
-    adapter?.quill.focus();
-  });
+export async function asyncFocusRichText(page: Page, id: string) {
+  await sleep();
+  const adapter = page.richTextAdapters.get(id);
+  adapter?.quill.focus();
 }
 
 export function isCollapsedAtBlockStart(quill: Quill) {
@@ -17,22 +17,22 @@ export function isCollapsedAtBlockStart(quill: Quill) {
 }
 
 export function convertToList(
-  space: Space,
+  page: Page,
   model: ExtendedModel,
   listType: 'bulleted' | 'numbered' | 'todo',
   prefix: string,
   otherProperties?: Record<string, unknown>
 ): boolean {
-  if (model.flavour === 'affine:list' && model['type'] === listType) {
+  if (matchFlavours(model, ['affine:list']) && model['type'] === listType) {
     return false;
   }
-  if (model.flavour === 'affine:paragraph') {
-    const parent = space.getParent(model);
+  if (matchFlavours(model, ['affine:paragraph'])) {
+    const parent = page.getParent(model);
     if (!parent) return false;
 
     const index = parent.children.indexOf(model);
     model.text?.insert(' ', prefix.length);
-    space.captureSync();
+    page.captureSync();
 
     model.text?.delete(0, prefix.length + 1);
     const blockProps = {
@@ -42,36 +42,39 @@ export function convertToList(
       children: model.children,
       ...otherProperties,
     };
-    space.deleteBlock(model);
+    page.deleteBlock(model);
 
-    const id = space.addBlock(blockProps, parent, index);
-    asyncFocusRichText(space, id);
-  } else if (model.flavour === 'affine:list' && model['type'] !== listType) {
+    const id = page.addBlock(blockProps, parent, index);
+    asyncFocusRichText(page, id);
+  } else if (
+    matchFlavours(model, ['affine:list']) &&
+    model['type'] !== listType
+  ) {
     model.text?.insert(' ', prefix.length);
-    space.captureSync();
+    page.captureSync();
 
     model.text?.delete(0, prefix.length + 1);
-    space.updateBlock(model, { type: listType });
+    page.updateBlock(model, { type: listType });
   }
   return true;
 }
 
 export function convertToParagraph(
-  space: Space,
+  page: Page,
   model: ExtendedModel,
-  type: 'affine:paragraph' | 'quote' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+  type: 'text' | 'quote' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
   prefix: string
 ): boolean {
-  if (model.flavour === 'affine:paragraph' && model['type'] === type) {
+  if (matchFlavours(model, ['affine:paragraph']) && model['type'] === type) {
     return false;
   }
-  if (model.flavour !== 'affine:paragraph') {
-    const parent = space.getParent(model);
+  if (!matchFlavours(model, ['affine:paragraph'])) {
+    const parent = page.getParent(model);
     if (!parent) return false;
 
     const index = parent.children.indexOf(model);
     model.text?.insert(' ', prefix.length);
-    space.captureSync();
+    page.captureSync();
 
     model.text?.delete(0, prefix.length + 1);
     const blockProps = {
@@ -80,16 +83,48 @@ export function convertToParagraph(
       text: model?.text?.clone(),
       children: model.children,
     };
-    space.deleteBlock(model);
+    page.deleteBlock(model);
 
-    const id = space.addBlock(blockProps, parent, index);
-    asyncFocusRichText(space, id);
-  } else if (model.flavour === 'affine:paragraph' && model['type'] !== type) {
+    const id = page.addBlock(blockProps, parent, index);
+    asyncFocusRichText(page, id);
+  } else if (
+    matchFlavours(model, ['affine:paragraph']) &&
+    model['type'] !== type
+  ) {
     model.text?.insert(' ', prefix.length);
-    space.captureSync();
+    page.captureSync();
 
     model.text?.delete(0, prefix.length + 1);
-    space.updateBlock(model, { type: type });
+    page.updateBlock(model, { type: type });
+  }
+  return true;
+}
+
+export function convertToDivider(
+  page: Page,
+  model: ExtendedModel,
+  prefix: string
+): boolean {
+  if (matchFlavours(model, ['affine:divider'])) {
+    return false;
+  }
+  if (!matchFlavours(model, ['affine:divider'])) {
+    const parent = page.getParent(model);
+    if (!parent) return false;
+
+    const index = parent.children.indexOf(model);
+    model.text?.insert(' ', prefix.length);
+    page.captureSync();
+
+    model.text?.delete(0, prefix.length + 1);
+    const blockProps = {
+      flavour: 'affine:divider',
+      children: model.children,
+    };
+    // space.deleteBlock(model);
+    page.addBlock(blockProps, parent, index);
+    const id = page.id;
+    asyncFocusRichText(page, id);
   }
   return true;
 }

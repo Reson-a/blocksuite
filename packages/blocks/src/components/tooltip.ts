@@ -12,6 +12,7 @@ import { css } from 'lit';
  */
 export const toolTipStyle = css`
   tool-tip {
+    font-family: var(--affine-font-family);
     position: absolute;
     left: 0;
     top: 0;
@@ -23,15 +24,18 @@ export const toolTipStyle = css`
     color: var(--affine-tooltip-color);
     background: var(--affine-tooltip-background);
     box-shadow: var(--affine-tooltip-shadow);
-    border-radius: 10px 10px 10px 0px;
-
     opacity: 0;
     transform: translateX(0) translateY(calc(-100% - 8px));
     transition: opacity 0.2s ease, transform 0.2s ease;
     pointer-events: none;
     user-select: none;
   }
-
+  tool-tip:is([tip-position='right']) {
+    left: unset;
+    right: 0;
+    transform: translateX(calc(100% + 8px));
+    border-radius: 0px 10px 10px 10px;
+  }
   .has-tool-tip {
     position: relative;
   }

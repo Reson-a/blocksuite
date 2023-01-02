@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-import './utils/declare-test-window';
+import './utils/declare-test-window.js';
 import { test } from '@playwright/test';
 import {
   enterPlaygroundRoom,
@@ -12,8 +11,8 @@ import {
   waitDefaultPageLoaded,
   pressEnter,
   addGroupByClick,
-  initEmptyState,
-} from './utils/actions';
+  initEmptyParagraphState,
+} from './utils/actions/index.js';
 import {
   defaultStore,
   assertBlockChildrenIds,
@@ -22,11 +21,11 @@ import {
   assertText,
   assertRichTexts,
   assertTitle,
-} from './utils/asserts';
+} from './utils/asserts.js';
 
 test('basic input', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
 
@@ -39,26 +38,22 @@ test('basic init with external text', async ({ page }) => {
   await enterPlaygroundRoom(page);
 
   await page.evaluate(() => {
-    const space = window.store
-      .createSpace('page-test')
-      .register(window.blockSchema);
-    const editor = document.createElement('editor-container');
-    // @ts-ignore
-    editor.space = space;
-    document.body.appendChild(editor);
+    const { page } = window;
+    const pageId = page.addBlock({ flavour: 'affine:page', title: 'hello' });
+    const groupId = page.addBlock({ flavour: 'affine:group' }, pageId);
 
-    const pageId = space.addBlock({ flavour: 'affine:page', title: 'hello' });
-    const groupId = space.addBlock({ flavour: 'affine:group' }, pageId);
-
-    const text = new space.Text(space, 'world');
-    space.addBlock({ flavour: 'affine:paragraph', text }, groupId);
+    const text = new page.Text(page, 'world');
+    page.addBlock({ flavour: 'affine:paragraph', text }, groupId);
 
     const delta = [
       { insert: 'foo ' },
       { insert: 'bar', attributes: { bold: true } },
     ];
-    space.addBlock(
-      { flavour: 'affine:paragraph', text: space.Text.fromDelta(space, delta) },
+    page.addBlock(
+      {
+        flavour: 'affine:paragraph',
+        text: page.Text.fromDelta(page, delta),
+      },
       groupId
     );
   });
@@ -69,21 +64,11 @@ test('basic init with external text', async ({ page }) => {
 
 test('basic multi user state', async ({ browser, page: pageA }) => {
   const room = await enterPlaygroundRoom(pageA);
-  await initEmptyState(pageA);
+  await initEmptyParagraphState(pageA);
   await pageA.keyboard.type('hello');
 
   const pageB = await browser.newPage();
   await enterPlaygroundRoom(pageB, room);
-  await pageB.evaluate(() => {
-    const space = window.store
-      .createSpace('page-test')
-      .register(window.blockSchema);
-    const editor = document.createElement('editor-container');
-    // @ts-ignore
-    editor.space = space;
-    document.body.appendChild(editor);
-  });
-
   await waitDefaultPageLoaded(pageB);
   await assertTitle(pageB, 'hello');
 
@@ -93,21 +78,12 @@ test('basic multi user state', async ({ browser, page: pageA }) => {
 
 test('A open and edit, then joins B', async ({ browser, page: pageA }) => {
   const room = await enterPlaygroundRoom(pageA);
-  await initEmptyState(pageA);
+  await initEmptyParagraphState(pageA);
   await focusRichText(pageA);
   await pageA.keyboard.type('hello');
 
   const pageB = await browser.newPage();
   await enterPlaygroundRoom(pageB, room);
-  await pageB.evaluate(() => {
-    const space = window.store
-      .createSpace('page-test')
-      .register(window.blockSchema);
-    const editor = document.createElement('editor-container');
-    // @ts-ignore
-    editor.space = space;
-    document.body.appendChild(editor);
-  });
 
   // wait until pageB content updated
   await assertText(pageB, 'hello');
@@ -122,21 +98,11 @@ test('A open and edit, then joins B', async ({ browser, page: pageA }) => {
 
 test('A first open, B first edit', async ({ browser, page: pageA }) => {
   const room = await enterPlaygroundRoom(pageA);
-  await pageA.evaluate(() => {
-    const space = window.store
-      .createSpace('page-test')
-      .register(window.blockSchema);
-    const editor = document.createElement('editor-container');
-    // @ts-ignore
-    editor.space = space;
-    document.body.appendChild(editor);
-  });
-  // await focusFirstTextBlock(pageA); // do not init (add blocks) in A
+  await initEmptyParagraphState(pageA);
+  await focusRichText(pageA);
 
   const pageB = await browser.newPage();
   await enterPlaygroundRoom(pageB, room);
-
-  await initEmptyState(pageB);
   await focusRichText(pageB);
   await pageB.keyboard.type('hello');
 
@@ -160,8 +126,8 @@ test('does not sync when disconnected', async ({ browser, page: pageA }) => {
   await disconnectByClick(pageB);
 
   // click together, both init with default id should lead to conflicts
-  await initEmptyState(pageA);
-  await initEmptyState(pageB);
+  await initEmptyParagraphState(pageA);
+  await initEmptyParagraphState(pageB);
   await focusRichText(pageA);
   await focusRichText(pageB);
   await pageA.keyboard.type('');
@@ -175,17 +141,17 @@ test('does not sync when disconnected', async ({ browser, page: pageA }) => {
 
 test('basic paired undo/redo', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
 
   await assertText(page, 'hello');
-  await undoByClick(page);
+  await undoByKeyboard(page);
   await assertEmpty(page);
-  await redoByClick(page);
+  await redoByKeyboard(page);
   await assertText(page, 'hello');
 
-  await undoByClick(page);
+  await undoByKeyboard(page);
   await assertEmpty(page);
   await redoByKeyboard(page);
   await assertText(page, 'hello');
@@ -193,7 +159,7 @@ test('basic paired undo/redo', async ({ page }) => {
 
 test('undo/redo with keyboard', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
 
@@ -206,7 +172,7 @@ test('undo/redo with keyboard', async ({ page }) => {
 
 test('undo after adding block twice', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
 
   await focusRichText(page);
   await page.keyboard.type('hello');
@@ -221,7 +187,7 @@ test('undo after adding block twice', async ({ page }) => {
 
 test('undo/redo twice after adding block twice', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await page.keyboard.type('hello');
   await pressEnter(page);
@@ -232,7 +198,7 @@ test('undo/redo twice after adding block twice', async ({ page }) => {
   await assertRichTexts(page, ['hello']);
 
   await undoByKeyboard(page);
-  await assertRichTexts(page, []);
+  await assertRichTexts(page, ['\n']);
 
   await redoByClick(page);
   await assertRichTexts(page, ['hello']);
@@ -243,7 +209,7 @@ test('undo/redo twice after adding block twice', async ({ page }) => {
 
 test('undo multi groups', async ({ page }) => {
   await enterPlaygroundRoom(page);
-  await initEmptyState(page);
+  await initEmptyParagraphState(page);
   await focusRichText(page);
   await addGroupByClick(page);
   await assertRichTexts(page, ['\n', '\n']);

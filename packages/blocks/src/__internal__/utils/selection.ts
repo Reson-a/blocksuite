@@ -1,19 +1,31 @@
-import type { BaseBlockModel, Space } from '@blocksuite/store';
-import type { RichText } from '../rich-text/rich-text';
-import { assertExists, caretRangeFromPoint, matchFlavours } from './std';
-import type { SelectedBlock, SelectionInfo, SelectionPosition } from './types';
+import type { BaseBlockModel, Page } from '@blocksuite/store';
+import type { RichText } from '../rich-text/rich-text.js';
+import type { IPoint, SelectionEvent } from './gesture.js';
 import {
   getBlockElementByModel,
-  getDefaultPageBlock,
   getContainerByModel,
-  getPreviousBlock,
-  getNextBlock,
-  getModelsByRange,
   getCurrentRange,
+  getDefaultPageBlock,
+  getModelByElement,
+  getModelsByRange,
+  getNextBlock,
+  getPreviousBlock,
   getQuillIndexByNativeSelection,
-} from './query';
-import { Rect } from './rect';
-import type { SelectionEvent } from './gesture';
+  getTextNodeBySelectedBlock,
+} from './query.js';
+import { Rect } from './rect.js';
+import {
+  assertExists,
+  caretRangeFromPoint,
+  matchFlavours,
+  sleep,
+} from './std.js';
+import type {
+  DomSelectionType,
+  SelectedBlock,
+  SelectionInfo,
+  SelectionPosition,
+} from './types.js';
 
 const SCROLL_THRESHOLD = 100;
 
@@ -47,8 +59,9 @@ function backwardSelect(newRange: Range, range: Range) {
 }
 
 function fixCurrentRangeToText(
-  x: number,
-  y: number,
+  clientX: number,
+  clientY: number,
+  offset: IPoint,
   range: Range,
   isForward: boolean
 ) {
@@ -64,18 +77,20 @@ function fixCurrentRangeToText(
       const text = isForward
         ? texts.reverse().find(t => {
             const rect = t.getBoundingClientRect();
-            return y >= rect.top; // handle both drag downward, and rightward
+            return clientY >= rect.top; // handle both drag downward, and rightward
           })
         : texts.find(t => {
             const rect = t.getBoundingClientRect();
-            return y <= rect.bottom; // handle both drag upwards and leftward
+            return clientY <= rect.bottom; // handle both drag upwards and leftward
           });
       if (!text) {
         throw new Error('Failed to focus text node!');
       }
       const rect = text.getBoundingClientRect();
-      const newY = isForward ? rect.bottom - 6 : rect.top + 6;
-      newRange = caretRangeFromPoint(x, newY);
+      const newY = isForward
+        ? rect.bottom - offset.y - 6
+        : rect.top - offset.y + 6;
+      newRange = caretRangeFromPoint(clientX, newY);
       if (isForward && newRange) {
         forwardSelect(newRange, range);
       } else if (!isForward && newRange) {
@@ -84,14 +99,6 @@ function fixCurrentRangeToText(
     }
   }
   return range;
-}
-
-async function sleep(delay = 0) {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve(null);
-    }, delay);
-  });
 }
 
 function setStartRange(editableContainer: Element) {
@@ -121,7 +128,7 @@ function setEndRange(editableContainer: Element) {
 }
 
 async function setNewTop(y: number, editableContainer: Element) {
-  const scrollContainer = editableContainer.closest('.affine-editor-container');
+  const scrollContainer = editableContainer.closest('.affine-default-viewport');
   const { top, bottom } = Rect.fromDom(editableContainer);
   const { clientHeight } = document.documentElement;
   const lineHeight =
@@ -156,8 +163,8 @@ async function setNewTop(y: number, editableContainer: Element) {
 }
 
 export async function focusRichText(
-  position: SelectionPosition,
-  editableContainer: Element
+  editableContainer: Element,
+  position: SelectionPosition = 'end'
 ) {
   // TODO optimize how get scroll container
   const { left, right } = Rect.fromDom(editableContainer);
@@ -187,14 +194,38 @@ export async function focusRichText(
   resetNativeSelection(range);
 }
 
-function focusRichTextByModel(
-  position: SelectionPosition,
-  model: BaseBlockModel
+export function focusBlockByModel(
+  model: BaseBlockModel,
+  position: SelectionPosition = 'end'
 ) {
+  const defaultPageBlock = getDefaultPageBlock(model);
+  if (matchFlavours(model, ['affine:embed', 'affine:divider'])) {
+    defaultPageBlock.selection.state.clear();
+    const rect = getBlockElementByModel(model)?.getBoundingClientRect();
+    rect && defaultPageBlock.signals.updateSelectedRects.emit([rect]);
+    const embedElement = getBlockElementByModel(model);
+    assertExists(embedElement);
+    defaultPageBlock.selection.state.selectedBlocks.push(embedElement);
+    defaultPageBlock.selection.state.type = 'block';
+    resetNativeSelection(null);
+    (document.activeElement as HTMLTextAreaElement).blur();
+    return;
+  }
+  // TODO maybe the section can merge to the above
+  if (matchFlavours(model, ['affine:code'])) {
+    const selectionManager = defaultPageBlock.selection;
+    const codeBlockElement = getBlockElementByModel(model) as HTMLElement;
+    const blockRect = codeBlockElement.getBoundingClientRect();
+    selectionManager.resetSelectedBlockByRect(blockRect, 'focus');
+    resetNativeSelection(null);
+    return;
+  }
+
   const element = getBlockElementByModel(model);
   const editableContainer = element?.querySelector('[contenteditable]');
+  defaultPageBlock.selection.state.clear();
   if (editableContainer) {
-    focusRichText(position, editableContainer);
+    focusRichText(editableContainer, position);
   }
 }
 
@@ -214,7 +245,7 @@ export function focusPreviousBlock(
 
   const preNodeModel = getPreviousBlock(container, model.id);
   if (preNodeModel && nextPosition) {
-    focusRichTextByModel(nextPosition, preNodeModel);
+    focusBlockByModel(preNodeModel, nextPosition);
   }
 }
 
@@ -223,8 +254,6 @@ export function focusNextBlock(
   position: SelectionPosition = 'start'
 ) {
   const page = getDefaultPageBlock(model);
-  // const container = getContainerByModel(model);
-
   let nextPosition = position;
   if (nextPosition) {
     page.lastSelectionPosition = nextPosition;
@@ -232,15 +261,17 @@ export function focusNextBlock(
     nextPosition = page.lastSelectionPosition;
   }
   const nextNodeModel = getNextBlock(model.id);
+
   if (nextNodeModel) {
-    focusRichTextByModel(nextPosition, nextNodeModel);
+    focusBlockByModel(nextNodeModel, nextPosition);
   }
 }
 
 export function resetNativeSelection(range: Range | null) {
   const selection = window.getSelection();
-  selection?.removeAllRanges();
-  range && selection?.addRange(range);
+  assertExists(selection);
+  selection.removeAllRanges();
+  range && selection.addRange(range);
 }
 
 export function focusRichTextByOffset(richTextParent: HTMLElement, x: number) {
@@ -279,8 +310,36 @@ export function isRangeSelection() {
   return !selection.isCollapsed;
 }
 
+/**
+ * Determine if the range contains multiple block.
+ *
+ * Please check the difference between {@link isMultiLineRange} before use this function
+ */
 export function isMultiBlockRange(range: Range) {
-  return range.commonAncestorContainer.nodeType !== Node.TEXT_NODE;
+  return getModelsByRange(range).length > 1;
+}
+
+/**
+ * Determine if the range contains multiple lines.
+ *
+ * Note that this function is very similar to {@link isMultiBlockRange},
+ * but they are slightly different.
+ *
+ * Consider the following scenarios:
+ * One block contains multiple lines,
+ * if you select multiple lines of text under this block,
+ * this function will return true,
+ * but {@link isMultiBlockRange} will return false.
+ */
+export function isMultiLineRange(range: Range) {
+  // Get the selection height
+  const { height } = range.getBoundingClientRect();
+
+  const oneLineRange = document.createRange();
+  oneLineRange.setStart(range.startContainer, range.startOffset);
+  // Get the base line height
+  const { height: oneLineHeight } = oneLineRange.getBoundingClientRect();
+  return height > oneLineHeight;
 }
 
 function getSelectedBlock(models: BaseBlockModel[]): SelectedBlock[] {
@@ -288,7 +347,7 @@ function getSelectedBlock(models: BaseBlockModel[]): SelectedBlock[] {
   const parentMap = new Map<string, SelectedBlock>();
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
-    const parent = model.space.getParent(model);
+    const parent = model.page.getParent(model);
     const block = { id: model.id, children: [] };
     if (!parent || !parentMap.has(parent.id)) {
       result.push(block);
@@ -311,29 +370,28 @@ function getLastSelectBlock(blocks: SelectedBlock[]): SelectedBlock | null {
   return getLastSelectBlock(last.children);
 }
 
-export function getSelectInfo(space: Space): SelectionInfo {
-  if (!space.root) {
+export function getSelectInfo(page: Page): SelectionInfo {
+  if (!page.root) {
     return {
       type: 'None',
       selectedBlocks: [],
     };
   }
 
-  let type = 'None';
+  let type: SelectionInfo['type'] = 'None';
   let selectedBlocks: SelectedBlock[] = [];
   let selectedModels: BaseBlockModel[] = [];
-  const page = getDefaultPageBlock(space.root);
-  const { state } = page.selection;
+  const pageBlock = getDefaultPageBlock(page.root);
+  const { state } = pageBlock.selection;
   const nativeSelection = window.getSelection();
   if (state.type === 'block') {
     type = 'Block';
-    const { selectedRichTexts } = state;
-    selectedModels = selectedRichTexts.map(richText => richText.model);
+    const { selectedBlocks } = state;
+    selectedModels = selectedBlocks.map(block => getModelByElement(block));
   } else if (nativeSelection && nativeSelection.type !== 'None') {
-    type = nativeSelection.type;
+    type = nativeSelection.type as DomSelectionType;
     selectedModels = getModelsByRange(getCurrentRange());
   }
-
   if (type !== 'None') {
     selectedBlocks = getSelectedBlock(selectedModels);
     if (type !== 'Block' && nativeSelection && selectedBlocks.length > 0) {
@@ -356,7 +414,7 @@ export function getSelectInfo(space: Space): SelectionInfo {
     }
   }
   return {
-    type: type,
+    type,
     selectedBlocks,
   };
 }
@@ -365,20 +423,20 @@ export function handleNativeRangeDragMove(
   startRange: Range | null,
   e: SelectionEvent
 ) {
-  let isForward = true;
+  const isForward = e.x > e.start.x || e.y > e.start.y;
   assertExists(startRange);
   const { startContainer, startOffset, endContainer, endOffset } = startRange;
   let currentRange = caretRangeFromPoint(e.raw.clientX, e.raw.clientY);
-  if (currentRange?.comparePoint(endContainer, endOffset) === 1) {
-    isForward = false;
-    currentRange?.setEnd(endContainer, endOffset);
-  } else {
+  if (isForward) {
     currentRange?.setStart(startContainer, startOffset);
+  } else {
+    currentRange?.setEnd(endContainer, endOffset);
   }
   if (currentRange) {
     currentRange = fixCurrentRangeToText(
       e.raw.clientX,
       e.raw.clientY,
+      e.containerOffset,
       currentRange,
       isForward
     );
@@ -392,7 +450,7 @@ function isBlankAreaBetweenBlocks(startContainer: Node) {
 }
 
 function isBlankAreaAfterLastBlock(startContainer: HTMLElement) {
-  return startContainer.tagName === 'GROUP-BLOCK';
+  return startContainer.tagName === 'AFFINE-GROUP';
 }
 
 function isBlankAreaBeforeFirstBlock(startContainer: HTMLElement) {
@@ -405,7 +463,7 @@ export function isBlankArea(e: SelectionEvent) {
   return cursor !== 'text';
 }
 
-export function handleNativeRangeClick(space: Space, e: SelectionEvent) {
+export function handleNativeRangeClick(page: Page, e: SelectionEvent) {
   const range = caretRangeFromPoint(e.raw.clientX, e.raw.clientY);
   const startContainer = range?.startContainer;
   // if not left click
@@ -425,7 +483,7 @@ export function handleNativeRangeClick(space: Space, e: SelectionEvent) {
   ) {
     focusRichTextByOffset(startContainer, e.raw.clientX);
   } else if (isBlankAreaAfterLastBlock(startContainer)) {
-    const { root } = space;
+    const { root } = page;
     const lastChild = root?.lastChild();
     assertExists(lastChild);
     if (matchFlavours(lastChild, ['affine:paragraph', 'affine:list'])) {
@@ -436,38 +494,43 @@ export function handleNativeRangeClick(space: Space, e: SelectionEvent) {
   }
 }
 
-export function handleNativeRangeDblClick(space: Space, e: SelectionEvent) {
+export function handleNativeRangeDblClick(page: Page, e: SelectionEvent) {
   const selection = window.getSelection();
   if (selection && selection.isCollapsed && selection.anchorNode) {
     const editableContainer =
       selection.anchorNode.parentElement?.closest('[contenteditable]');
     if (editableContainer) {
-      expandRangesByCharacter(selection, editableContainer);
+      return expandRangeByCharacter(selection, editableContainer);
     }
+    return null;
   }
+  return null;
 }
 
-function expandRangesByCharacter(
-  selection: Selection,
-  editableContainer: Node
-) {
+function expandRangeByCharacter(selection: Selection, editableContainer: Node) {
   const leafNodes = leftFirstSearchLeafNodes(editableContainer);
   if (!leafNodes.length) {
-    return;
+    return null;
   }
   const [newRange, currentChar, currentNodeIndex] = getNewRangeForDblClick(
     leafNodes,
     selection
   );
   // try select range by segmenter
-  trySelectBySegmenter(
+  const extendRange = trySelectBySegmenter(
     selection,
     newRange,
     currentChar,
     leafNodes,
     currentNodeIndex
   );
-  resetNativeSelection(newRange);
+
+  // don't mutate selection if it's not changed
+  if (extendRange) {
+    resetNativeSelection(extendRange);
+  }
+
+  return extendRange;
 }
 
 function getNewStartAndEndForDblClick(
@@ -592,6 +655,8 @@ function trySelectBySegmenter(
       selection,
       currentChar
     );
+    if (currentCharIndex === -1) return null;
+
     // length for expand left
     let leftLength = currentCharIndex;
     // length for expand right
@@ -626,6 +691,7 @@ function trySelectBySegmenter(
       }
     }
   }
+  return newRange;
 }
 
 function getCurrentCharIndex(
@@ -639,6 +705,11 @@ function getCurrentCharIndex(
   const segmenter = new Intl.Segmenter([], { granularity: 'word' });
   const wordsIterator = segmenter.segment(rangeString)[Symbol.iterator]();
   const words = Array.from(wordsIterator);
+
+  if (words.length === 0) {
+    return [-1, ''] as const;
+  }
+
   let absoluteOffset = 0;
   let started = false;
   // get absolute offset of current cursor
@@ -697,10 +768,73 @@ export function getFirstTextNode(node: Node) {
   return leftFirstSearchLeafNodes(node)[0];
 }
 
-export function getSplicedTitle(title: HTMLInputElement) {
+export function getSplicedTitle(title: HTMLTextAreaElement) {
   const text = [...title.value];
   assertExists(title.selectionStart);
   assertExists(title.selectionEnd);
   text.splice(title.selectionStart, title.selectionEnd - title.selectionStart);
   return text.join('');
+}
+
+export function isEmbed(e: SelectionEvent) {
+  if ((e.raw.target as HTMLElement).classList.contains('resize')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Save the current block selection. Can be restored with {@link restoreSelection}.
+ *
+ * See also {@link restoreSelection}
+ *
+ * Note: If only one block is selected, this function will return the same block twice still.
+ * Note: If select multiple blocks, blocks in the middle will be skipped, only the first and last block will be returned.
+ */
+export const saveBlockSelection = (
+  selection = window.getSelection()
+): [SelectedBlock, SelectedBlock] => {
+  assertExists(selection);
+  const models = getModelsByRange(getCurrentRange(selection));
+  const startPos = getQuillIndexByNativeSelection(
+    selection.anchorNode,
+    selection.anchorOffset,
+    true
+  );
+  const endPos = getQuillIndexByNativeSelection(
+    selection.focusNode,
+    selection.focusOffset,
+    false
+  );
+
+  return [
+    { id: models[0].id, startPos, children: [] },
+    { id: models[models.length - 1].id, endPos, children: [] },
+  ];
+};
+
+/**
+ * Restore the block selection.
+ * See also {@link resetNativeSelection}
+ */
+export function restoreSelection(selectedBlocks: SelectedBlock[]) {
+  const startBlock = selectedBlocks[0];
+  const [startNode, startOffset] = getTextNodeBySelectedBlock(startBlock);
+
+  const endBlock = selectedBlocks[selectedBlocks.length - 1];
+  const [endNode, endOffset] = getTextNodeBySelectedBlock(endBlock);
+  if (!startNode || !endNode) {
+    console.warn(
+      'restoreSelection: startNode or endNode is null',
+      startNode,
+      endNode
+    );
+    return;
+  }
+
+  const range = getCurrentRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+  resetNativeSelection(range);
+  return range;
 }
