@@ -2,14 +2,14 @@ import { LitElement, html, css, unsafeCSS, PropertyValueMap } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { DatabaseBlockModel } from './database-model';
+import type { DatabaseBlockModel } from './database-model.js';
 import {
   BlockChildrenContainer,
   BLOCK_ID_ATTR,
   type BlockHost,
-} from '../__internal__';
-import style from './style.css';
-import { DataBaseViewType, IViewModel } from './view';
+} from '../__internal__/index.js';
+import style from './style.css?inline';
+import { DataBaseViewType, IViewModel } from './view/index.js';
 import './toolbar';
 
 @customElement('database-block')
@@ -33,10 +33,6 @@ export class DatabaseBlockComponent extends LitElement {
     return this;
   }
 
-  protected willUpdate(
-    _changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>
-  ): void {}
-
   firstUpdated() {
     this.model.propsUpdated.on(() => this.requestUpdate());
     this.model.childrenUpdated.on(() => this.requestUpdate());
@@ -45,7 +41,11 @@ export class DatabaseBlockComponent extends LitElement {
   render() {
     this.setAttribute(BLOCK_ID_ATTR, this.model.id);
 
-    const childrenContainer = BlockChildrenContainer(this.model, this.host);
+    const childrenContainer = BlockChildrenContainer(
+      this.model,
+      this.host,
+      () => this.requestUpdate()
+    );
 
     return html`
       <div

@@ -1,6 +1,6 @@
-import type { DatabaseItemBlockModel } from '../database-item-model';
-import type { ISchema } from '../database-model';
-import { Field, FieldFactory } from '../fields';
+import type { DatabaseItemBlockModel } from '../database-item-model.js';
+import type { ISchema } from '../database-model.js';
+import { Field, FieldFactory } from '../fields/index.js';
 
 export enum SortDirection {
   ASC,

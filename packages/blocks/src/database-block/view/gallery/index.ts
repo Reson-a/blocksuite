@@ -1,5 +1,5 @@
-export * from './gallery';
-import type { DataBaseViewType, IViewModel } from '../index';
+export * from './gallery.js';
+import type { DataBaseViewType, IViewModel } from '../index.js';
 
 export interface IGalleryViewModel extends IViewModel {
   type: DataBaseViewType.Gallery;

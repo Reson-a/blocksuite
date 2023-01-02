@@ -1,20 +1,20 @@
 import { html } from 'lit';
-import type { TextField } from './text-field';
-import type { NumberField } from './number-field';
-import type { CheckboxField } from './checkbox-field';
-import type { SelectField } from './select-field';
-import type { DateField } from './date-field';
-import TextFieldElement from './text-field';
-import NumberFieldElement from './number-field';
-import CheckboxFieldElement from './checkbox-field';
-import SelectFieldElement from './select-field';
-import DateFieldElement from './date-field';
+import type { TextField } from './text-field.js';
+import type { NumberField } from './number-field.js';
+import type { CheckboxField } from './checkbox-field.js';
+import type { SelectField } from './select-field.js';
+import type { DateField } from './date-field.js';
+import TextFieldElement from './text-field.js';
+import NumberFieldElement from './number-field.js';
+import CheckboxFieldElement from './checkbox-field.js';
+import SelectFieldElement from './select-field.js';
+import DateFieldElement from './date-field.js';
 
-export * from './text-field';
-export * from './number-field';
-export * from './checkbox-field';
-export * from './select-field';
-export * from './date-field';
+export * from './text-field.js';
+export * from './number-field.js';
+export * from './checkbox-field.js';
+export * from './select-field.js';
+export * from './date-field.js';
 
 // Define field type strings used in column config
 export enum FieldType {

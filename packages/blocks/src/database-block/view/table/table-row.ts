@@ -2,9 +2,9 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import style from './style.css';
-import type { DatabaseItemBlockModel } from '../../database-item-model';
-import type { ISchema } from '../../database-model';
+import style from './style.css?inline';
+import type { DatabaseItemBlockModel } from '../../database-item-model.js';
+import type { ISchema } from '../../database-model.js';
 
 @customElement(`affine-table-row`)
 class TableRow extends LitElement {

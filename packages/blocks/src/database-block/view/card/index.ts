@@ -7,14 +7,14 @@ import {
   PropertyValueMap,
 } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { DatabaseBlockModel, ISchema } from '../../database-model';
+import type { DatabaseBlockModel, ISchema } from '../../database-model.js';
 import { repeat } from 'lit/directives/repeat.js';
 // import { classMap } from 'lit/directives/class-map.js';
 // import { styleMap } from 'lit/directives/style-map.js';
-import type { DatabaseItemBlockModel } from '../../database-item-model';
-import type { BlockHost } from '../../../__internal__';
-import { FieldFactory } from '../../fields';
-import type { IViewModel } from '../index';
+import type { DatabaseItemBlockModel } from '../../database-item-model.js';
+import type { BlockHost } from '../../../__internal__/index.js';
+import { FieldFactory } from '../../fields/index.js';
+import type { IViewModel } from '../index.js';
 
 @customElement(`affine-card`)
 class Card extends LitElement {

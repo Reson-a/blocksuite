@@ -1,5 +1,5 @@
-export * from './board';
-import type { DataBaseViewType, IViewModel } from '../index';
+export * from './board.js';
+import type { DataBaseViewType, IViewModel } from '../index.js';
 
 export interface IBoardViewModel extends IViewModel {
   type: DataBaseViewType.Board;

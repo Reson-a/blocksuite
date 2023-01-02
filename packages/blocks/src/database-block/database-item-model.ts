@@ -1,5 +1,5 @@
-import { Space, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
-import type { Field, FieldType } from './fields';
+import { Page, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
+import type { Field, FieldType } from './fields/index.js';
 
 export type FieldId = 'string';
 
@@ -16,8 +16,8 @@ export class DatabaseItemBlockModel
   flavour = 'affine:database-item' as const;
   fields: Record<string, Field>;
 
-  constructor(space: Space, props: Partial<DatabaseItemBlockModel>) {
-    super(space, props);
+  constructor(page: Page, props: Partial<DatabaseItemBlockModel>) {
+    super(page, props);
     this.fields = props.fields || {};
   }
 

@@ -1,6 +1,6 @@
-import type { DatabaseItemBlockModel } from '../database-item-model';
-import type { ISchema } from '../database-model';
-import { Field, FieldFactory, FieldType } from '../fields';
+import type { DatabaseItemBlockModel } from '../database-item-model.js';
+import type { ISchema } from '../database-model.js';
+import { Field, FieldFactory, FieldType } from '../fields/index.js';
 
 export enum FilterOperator {
   IS_EQUAL,

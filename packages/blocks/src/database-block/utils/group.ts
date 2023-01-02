@@ -1,7 +1,7 @@
-import type { DatabaseItemBlockModel } from '../database-item-model';
-import type { ISchema } from '../database-model';
-import { FieldFactory } from '../fields';
-import { SortDirection } from './sort';
+import type { DatabaseItemBlockModel } from '../database-item-model.js';
+import type { ISchema } from '../database-model.js';
+import { FieldFactory } from '../fields/index.js';
+import { SortDirection } from './sort.js';
 
 export interface IGroup {
   id: string;

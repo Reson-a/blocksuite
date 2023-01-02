@@ -7,17 +7,17 @@ import {
   PropertyValueMap,
 } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import style from './style.css';
-import type { DatabaseBlockModel, ISchema } from '../../database-model';
+import style from './style.css?inline';
+import type { DatabaseBlockModel, ISchema } from '../../database-model.js';
 import { repeat } from 'lit/directives/repeat.js';
 // import { classMap } from 'lit/directives/class-map.js';
 // import { styleMap } from 'lit/directives/style-map.js';
-import type { ITableViewModel } from '.';
-import { DatabaseItemBlockModel } from '../../database-item-model';
-import type { BlockHost } from '../../../__internal__';
-import { FieldFactory } from '../../fields';
+import type { ITableViewModel } from './index.js';
+import { DatabaseItemBlockModel } from '../../database-item-model.js';
+import type { BlockHost } from '../../../__internal__/index.js';
+import { FieldFactory } from '../../fields/index.js';
 import '../../components/input';
-import type { IGroupItem } from '../../utils';
+import type { IGroupItem } from '../../utils/index.js';
 
 @customElement(`affine-table`)
 class Table extends LitElement {
@@ -111,8 +111,6 @@ class Table extends LitElement {
         schema => schema.id,
         schema =>
           html`<affine-table-cell .width=${this.getColWidth(schema.id)}>
-            <!-- <rich-text .host=${this.host} .model=${item}></rich-text> -->
-
             ${FieldFactory.renderField(
               schema.type,
               item.fields[schema.id],

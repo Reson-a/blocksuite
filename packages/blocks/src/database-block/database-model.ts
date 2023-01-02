@@ -1,8 +1,8 @@
-import { Space, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
-import type { DatabaseItemBlockModel } from './database-item-model';
-import { FieldType } from './fields';
-import { DataBaseViewType, ITableViewModel } from './view';
-import type { IViewModel } from './view';
+import { Page, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
+import type { DatabaseItemBlockModel } from './database-item-model.js';
+import { FieldType } from './fields/index.js';
+import { DataBaseViewType, ITableViewModel } from './view/index.js';
+import type { IViewModel } from './view/index.js';
 import {
   filter,
   FilterOperator,
@@ -11,8 +11,8 @@ import {
   sort,
   SortDirection,
   group,
-} from './utils';
-import type { IGroup } from './utils/group';
+} from './utils/index.js';
+import type { IGroup } from './utils/group.js';
 
 export interface DatabaseBlockProps extends IBaseBlockProps {
   flavour: 'affine:database';
@@ -42,10 +42,10 @@ export class DatabaseBlockModel
   currentViewId = '';
   currentView!: IViewModel;
 
-  constructor(space: Space, props: Partial<DatabaseBlockModel>) {
-    super(space, props);
+  constructor(page: Page, props: Partial<DatabaseBlockModel>) {
+    super(page, props);
     if (!props.views)
-      return DatabaseBlockModel.createDefaultDatabaseBlock(space, props);
+      return DatabaseBlockModel.createDefaultDatabaseBlock(page, props);
     this.views = props.views || [];
     this.schemas = props.schemas || [];
     this.children = props.children || [];
@@ -54,10 +54,10 @@ export class DatabaseBlockModel
   }
 
   static createDefaultDatabaseBlock(
-    space: Space,
+    page: Page,
     props: Partial<DatabaseBlockModel>
   ) {
-    const block = new DatabaseBlockModel(space, {
+    const block = new DatabaseBlockModel(page, {
       ...props,
       name: 'TEST_DATABASE',
       views: [],
@@ -119,20 +119,20 @@ export class DatabaseBlockModel
     props: Partial<DatabaseItemBlockModel> = {},
     index = this.children.length
   ) {
-    const id = this.space.addBlock(
+    const id = this.page.addBlock(
       { flavour: 'affine:database-item', ...props },
       this,
       index
     );
-    return this.space.getBlockById(id);
+    return this.page.getBlockById(id);
   }
 
   updateItem(id: string, props: Partial<DatabaseItemBlockModel>) {
-    this.space.updateBlockById(id, props);
+    this.page.updateBlockById(id, props);
   }
 
   deleteItem(id: string) {
-    this.space.deleteBlockById(id);
+    this.page.deleteBlockById(id);
   }
 
   syncViews() {
@@ -171,7 +171,7 @@ export class DatabaseBlockModel
   }
 
   setActiveView(id: string) {
-    this.space.updateBlock(this, { currentViewId: id });
+    this.page.updateBlock(this, { currentViewId: id });
     this.currentView =
       this.views.find(view => view.id == this.currentViewId) || this.views[0];
   }

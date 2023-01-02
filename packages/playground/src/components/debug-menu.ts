@@ -27,6 +27,8 @@ import {
   getCurrentRange,
   getModelsByRange,
   type GroupBlockModel,
+  type DatabaseBlockModel,
+  type DatabaseItemBlockModel,
   MouseMode,
   ShapeMouseMode,
   TDShapeType,
@@ -173,6 +175,25 @@ export class DebugMenu extends LitElement {
       pageId
     );
     this.page.addBlock({ flavour: 'affine:paragraph' }, groupId);
+  }
+
+  private _addDataBase() {
+    const root = this.page.root;
+    if (!root) return;
+    const pageId = root.id;
+
+    this.page.captureSync();
+
+    const databaseId = this.page.addBlock<DatabaseBlockModel>(
+      { flavour: 'affine:database' },
+      pageId
+    );
+    for (let i = 0; i < 2; i++) {
+      this.page.addBlock<DatabaseItemBlockModel>(
+        { flavour: 'affine:database-item' },
+        databaseId
+      );
+    }
   }
 
   private _switchMouseMode() {
@@ -369,6 +390,9 @@ export class DebugMenu extends LitElement {
                 ${this.connected ? 'Disconnect' : 'Connect'}
               </sl-menu-item>
               <sl-menu-item @click=${this._addGroup}> Add Group </sl-menu-item>
+              <sl-menu-item @click=${this._addDataBase}>
+                Add DataBase
+              </sl-menu-item>
               <sl-menu-item @click=${this._toggleReadonly}>
                 Toggle Readonly
               </sl-menu-item>

@@ -2,11 +2,11 @@ import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import style from './style.css';
+import style from './style.css?inline';
 
-import type { DatabaseBlockModel, ISchema } from '../../database-model';
-import type { IGroup } from '../../utils';
-import type { DatabaseItemBlockModel } from '../../database-item-model';
+import type { DatabaseBlockModel, ISchema } from '../../database-model.js';
+import type { IGroup } from '../../utils/index.js';
+import type { DatabaseItemBlockModel } from '../../database-item-model.js';
 
 @customElement(`affine-table-row-group`)
 class TableRowGroup extends LitElement {

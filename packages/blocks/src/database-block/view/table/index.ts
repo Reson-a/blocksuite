@@ -7,12 +7,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export * from './table';
-export * from './table-cell';
-export * from './table-row';
-export * from './table-row-group';
+export * from './table.js';
+export * from './table-cell.js';
+export * from './table-row.js';
+export * from './table-row-group.js';
 
-import type { DataBaseViewType, IViewModel } from '../index';
+import type { DataBaseViewType, IViewModel } from '../index.js';
 
 export interface ITableViewModel extends IViewModel {
   type: DataBaseViewType.Table;

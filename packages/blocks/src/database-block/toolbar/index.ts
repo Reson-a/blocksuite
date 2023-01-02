@@ -1,12 +1,12 @@
 import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import type { DatabaseBlockModel } from '../database-model';
-import type { IViewModel } from '../view';
-import style from './style.css';
+import type { DatabaseBlockModel } from '../database-model.js';
+import type { IViewModel } from '../view/index.js';
+import style from './style.css?inline';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
-import { FilterOperator, SortDirection } from '../utils';
+import { FilterOperator, SortDirection } from '../utils/index.js';
 
 @customElement(`affine-database-toolbar`)
 class ToolBar extends LitElement {

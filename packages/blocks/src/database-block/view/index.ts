@@ -1,5 +1,5 @@
-import type { FilterType, IFilter, ISort } from '../utils';
-import type { IGroup } from '../utils/group';
+import type { FilterType, IFilter, ISort } from '../utils/index.js';
+import type { IGroup } from '../utils/group.js';
 
 export enum DataBaseViewType {
   Table,
@@ -20,7 +20,7 @@ export interface IViewModel {
   groups?: IGroup[];
 }
 
-export * from './table';
-export * from './gallery';
-export * from './board';
-export * from './card';
+export * from './table/index.js';
+export * from './gallery/index.js';
+export * from './board/index.js';
+export * from './card/index.js';
