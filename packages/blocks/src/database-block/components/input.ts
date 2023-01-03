@@ -1,4 +1,4 @@
-import { html, LitElement, css, unsafeCSS, PropertyValueMap } from 'lit';
+import { html, LitElement, css, PropertyValueMap } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 export type Dictionary<T> = { [key: string]: T };
@@ -38,8 +38,6 @@ class Input extends LitElement {
 
   @property()
   placeholder!: string;
-
-  firstUpdated() {}
 
   protected willUpdate(
     _changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>

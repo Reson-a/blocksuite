@@ -1,5 +1,5 @@
 import { Page, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
-import type { Field, FieldType } from './fields/index.js';
+import type { Field } from './fields/index.js';
 
 export type FieldId = 'string';
 

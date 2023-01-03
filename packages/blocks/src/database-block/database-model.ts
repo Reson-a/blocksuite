@@ -1,7 +1,7 @@
 import { Page, BaseBlockModel, IBaseBlockProps } from '@blocksuite/store';
 import type { DatabaseItemBlockModel } from './database-item-model.js';
 import { FieldType } from './fields/index.js';
-import { DataBaseViewType, ITableViewModel } from './view/index.js';
+import { DataBaseViewType } from './view/index.js';
 import type { IViewModel } from './view/index.js';
 import {
   filter,

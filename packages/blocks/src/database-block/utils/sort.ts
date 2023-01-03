@@ -1,6 +1,6 @@
 import type { DatabaseItemBlockModel } from '../database-item-model.js';
 import type { ISchema } from '../database-model.js';
-import { Field, FieldFactory } from '../fields/index.js';
+import { FieldFactory } from '../fields/index.js';
 
 export enum SortDirection {
   ASC,
@@ -13,7 +13,8 @@ export interface ISort {
   direction: SortDirection;
 }
 
-type Comparator = (a: Field, b: Field) => number;
+//
+// type Comparator = (a: Field, b: Field) => number;
 
 export function sort(
   items: DatabaseItemBlockModel[],

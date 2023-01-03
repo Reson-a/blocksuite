@@ -1,6 +1,5 @@
-import { LitElement, html, css, unsafeCSS, PropertyValueMap } from 'lit';
+import { LitElement, html, css, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { repeat } from 'lit/directives/repeat.js';
 
 import type { DatabaseBlockModel } from './database-model.js';
 import {
@@ -9,7 +8,7 @@ import {
   type BlockHost,
 } from '../__internal__/index.js';
 import style from './style.css?inline';
-import { DataBaseViewType, IViewModel } from './view/index.js';
+import { DataBaseViewType } from './view/index.js';
 import './toolbar';
 
 @customElement('database-block')

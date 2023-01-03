@@ -5,7 +5,6 @@ import type { DatabaseBlockModel } from '../database-model.js';
 import type { IViewModel } from '../view/index.js';
 import style from './style.css?inline';
 import { classMap } from 'lit/directives/class-map.js';
-import { styleMap } from 'lit/directives/style-map.js';
 import { FilterOperator, SortDirection } from '../utils/index.js';
 
 @customElement(`affine-database-toolbar`)

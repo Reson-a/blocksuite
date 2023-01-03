@@ -1,11 +1,4 @@
-import {
-  LitElement,
-  html,
-  css,
-  unsafeCSS,
-  PropertyValues,
-  PropertyValueMap,
-} from 'lit';
+import { LitElement, html, css, PropertyValueMap } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { DatabaseBlockModel, ISchema } from '../../database-model.js';
 import { repeat } from 'lit/directives/repeat.js';
