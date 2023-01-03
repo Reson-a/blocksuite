@@ -1,0 +1,1 @@
+import{_ as o}from"./index-8178a27c.js";class a{constructor(){this.isLoaded=!1,this.load=async()=>{this.hljs=await o(()=>import("./index-85716a15.js"),[])}}}export{a as CodeBlockService,a as default};

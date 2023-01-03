@@ -5,10 +5,43 @@
     <link rel="icon" type="image/svg+xml" href="/blocksuite/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BlockSuite Playground</title>
-    <script type="module" crossorigin src="/blocksuite/assets/index.23aad058.js"></script>
-    <link rel="stylesheet" href="/blocksuite/assets/index.78b0f763.css">
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: var(--affine-page-background);
+        transition: background-color 0.3s;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      #init-btn {
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        background-color: white;
+        border: none;
+        border-radius: 0.25rem;
+        padding: 8px;
+        font-size: 12px;
+        border-style: solid;
+        border-width: 1px;
+        border-color: #d4d4d8;
+        z-index: 10;
+      }
+      #init-btn:not(:disabled) {
+        cursor: pointer;
+      }
+    </style>
+    <script type="module" crossorigin src="/blocksuite/assets/index-8178a27c.js"></script>
+    <link rel="stylesheet" href="/blocksuite/assets/index-3e211e0c.css">
   </head>
   <body>
+    <button id="init-btn">Init Editor</button>
     
   </body>
 </html>
